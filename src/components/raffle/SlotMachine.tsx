@@ -82,7 +82,7 @@ export function SlotMachine({ participants, winner, isSpinning, onSpinEnd }: Slo
   return (
     <div className="relative h-[15rem] w-full max-w-lg overflow-hidden bg-background/30 rounded-2xl shadow-2xl">
       <div 
-        className="absolute top-1/2 left-0 right-0 h-[5rem] -translate-y-1/2 rounded-lg border-2 border-accent/80 shadow-[0_0_20px_3px_var(--tw-shadow-color)] shadow-accent/70 z-20 pointer-events-none" 
+        className="absolute top-1/2 left-0 right-0 h-[5rem] -translate-y-1/2 rounded-lg border-2 border-primary/80 shadow-[0_0_20px_3px_var(--tw-shadow-color)] shadow-primary/70 z-20 pointer-events-none" 
         aria-hidden="true" 
       />
       <div 

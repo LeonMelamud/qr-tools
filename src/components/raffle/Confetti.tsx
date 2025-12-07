@@ -23,7 +23,7 @@ export function Confetti({ isCelebrating }: { isCelebrating: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationFrameId = useRef<number>();
   const particles = useRef<Particle[]>([]);
-  const themeColors = ['#F77737', '#EA4C89', '#4A148C', '#00FFFF'];
+  const themeColors = ['#FFC629', '#FFFFFF', '#212121'];
 
   const resetParticles = useCallback(() => {
     const canvas = canvasRef.current;

@@ -21,7 +21,7 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300..700&display=swap" rel="stylesheet" />
       </head>
       <body className={cn('font-body antialiased')}>
-        <div className="min-h-screen w-full" style={{ background: 'linear-gradient(160deg, #F77737 0%, #EA4C89 50%, #4A148C 100%)' }}>
+        <div className="min-h-screen w-full" style={{ background: 'linear-gradient(160deg, #FFC629 0%, #212121 50%, #212121 100%)' }}>
           {children}
         </div>
         <Toaster />
