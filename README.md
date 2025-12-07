@@ -36,6 +36,9 @@ A hypnotic raffle experience built with **Next.js**, **Tailwind CSS**, and **Sup
     ```
     *(Note: For local development, ask the team for the current credentials if you don't have them.)*
 
+4.  **Setup Database:**
+    Run the SQL script located in `docs/database_schema.sql` in your Supabase SQL Editor to create the necessary tables and policies.
+
 ## Running Locally
 
 Start the development server:
@@ -44,7 +47,7 @@ Start the development server:
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser.
+Open [http://localhost:9002](http://localhost:9002) with your browser.
 
 - **Participant View**: Scan the QR code or go to `/qr` to join.
 - **Host View**: The main page displays the raffle and participants.

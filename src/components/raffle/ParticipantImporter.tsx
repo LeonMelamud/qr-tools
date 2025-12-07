@@ -38,7 +38,7 @@ export function ParticipantImporter({ onParticipantsLoad, disabled, children }: 
         const nameIndex = header.indexOf('name');
         const displayNameIndex = header.indexOf('display_name');
         const emailIndex = header.indexOf('email');
-
+        const approvalStatusIndex = header.indexOf('approval_status');
 
         if (nameIndex === -1 && displayNameIndex === -1 && (firstNameIndex === -1 || lastNameIndex === -1)) {
           toast({
@@ -54,6 +54,11 @@ export function ParticipantImporter({ onParticipantsLoad, disabled, children }: 
           .map((line, index): Participant | null => {
             if (!line.trim()) return null;
             const data = line.split(',').map(s => s.trim().replace(/"/g, ''));
+
+            const status = approvalStatusIndex !== -1 ? data[approvalStatusIndex] : undefined;
+            if (approvalStatusIndex !== -1 && status?.toLowerCase() !== 'approved') {
+              return null;
+            }
 
             const firstName = firstNameIndex !== -1 ? data[firstNameIndex] : '';
             const lastName = lastNameIndex !== -1 ? data[lastNameIndex] : '';
@@ -102,7 +107,7 @@ export function ParticipantImporter({ onParticipantsLoad, disabled, children }: 
         } else {
           toast({
             title: "Import Failed",
-            description: "No valid participants found in the CSV file.",
+            description: "No eligible participants found (check approval_status).",
             variant: "destructive"
           });
         }

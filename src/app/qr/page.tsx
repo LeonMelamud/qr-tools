@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, Suspense } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -24,7 +24,7 @@ const formSchema = z.object({
   lastName: z.string().min(2, "Last name must be at least 2 characters.").max(50),
 });
 
-export default function QRPage() {
+function QRForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
@@ -186,5 +186,19 @@ export default function QRPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function QRPage() {
+  return (
+    <Suspense fallback={
+      <main className="flex flex-col items-center justify-center min-h-screen w-full p-4 md:p-8 bg-background">
+        <div className="text-center">
+          <div className="animate-pulse text-lg">Loading...</div>
+        </div>
+      </main>
+    }>
+      <QRForm />
+    </Suspense>
   );
 }
