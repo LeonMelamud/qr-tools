@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { Header } from "@/components/layout/Header";
+import { useParticipants } from "@/context/ParticipantsContext";
 
 const formSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters.").max(50),
@@ -26,6 +27,7 @@ const formSchema = z.object({
 export default function QRPage() {
   const router = useRouter();
   const { toast } = useToast();
+  const { setAllParticipants, setAvailableParticipants } = useParticipants();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -36,13 +38,20 @@ export default function QRPage() {
   });
 
   function onSubmit(values: z.infer<typeof formSchema>) {
-    // In a real app, you'd likely save this to a shared state or database
-    // For this demo, we'll just show a success message and redirect.
+    const newParticipant = {
+      id: `${values.name}-${values.lastName}-${Date.now()}`,
+      name: values.name,
+      lastName: values.lastName,
+      displayName: `${values.name} ${values.lastName.charAt(0)}.`,
+    };
+    
+    setAllParticipants(prev => [...prev, newParticipant]);
+    setAvailableParticipants(prev => [...prev, newParticipant]);
+    
     toast({
       title: "Participant Added",
       description: `${values.name} ${values.lastName} has been added to the raffle.`,
     });
-    console.log("New Participant from QR:", values);
     router.push('/');
   }
 
