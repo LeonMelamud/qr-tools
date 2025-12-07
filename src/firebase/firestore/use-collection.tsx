@@ -15,15 +15,11 @@ export function useCollection<T extends { id: string }>(
 ) {
   const [data, setData] = useState<T[] | null>(null);
   const [loading, setLoading] = useState(true);
-  const queryRef = useRef(queryOrRef);
 
   useEffect(() => {
-    // Prevent re-running the effect if the query object itself is the same
-    if (queryRef.current === queryOrRef && data) return;
-    queryRef.current = queryOrRef;
-
     if (!queryOrRef) {
         setLoading(false);
+        setData(null);
         return;
     }
     
@@ -55,7 +51,7 @@ export function useCollection<T extends { id: string }>(
     );
 
     return () => unsubscribe();
-  }, [queryOrRef, data]);
+  }, [queryOrRef]);
 
   return { data, loading };
 }
