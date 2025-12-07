@@ -4,8 +4,9 @@ import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from 'next/navigation';
-import { collection, addDoc } from "firebase/firestore";
+import { collection, addDoc, doc, setDoc } from "firebase/firestore";
 import { useFirestore } from "@/firebase";
+import { secureRandom } from '@/lib/utils';
 
 
 import { Button } from "@/components/ui/button";
@@ -39,18 +40,27 @@ export default function QRPage() {
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
+    if (!firestore) {
+      toast({ title: "Database not connected", description: "Please try again later.", variant: "destructive"});
+      return;
+    }
     try {
+        const displayName = `${values.name} ${values.lastName}`;
+        // Create a more robust unique ID
+        const id = `${displayName.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`;
+
         const newParticipant = {
             name: values.name,
             lastName: values.lastName,
-            displayName: `${values.name} ${values.lastName}`,
+            displayName: displayName,
         };
         
-        await addDoc(collection(firestore, "participants"), newParticipant);
+        const participantRef = doc(firestore, "participants", id);
+        await setDoc(participantRef, newParticipant);
         
         toast({
             title: "You're in!",
-            description: `Welcome to the raffle, ${values.name} ${values.lastName}!`,
+            description: `Welcome to the raffle, ${displayName}!`,
         });
         
         form.reset();

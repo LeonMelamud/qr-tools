@@ -33,6 +33,8 @@ export function SlotMachine({ participants, winner, isSpinning, onSpinEnd, loadi
   useEffect(() => {
     if (participants.length > 0) {
         setShuffledParticipants(participantList);
+    } else {
+        setShuffledParticipants([]);
     }
   }, [participants, participantList]);
   
@@ -122,4 +124,3 @@ export function SlotMachine({ participants, winner, isSpinning, onSpinEnd, loadi
     </div>
   );
 }
-

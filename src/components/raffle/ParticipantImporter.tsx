@@ -36,11 +36,13 @@ export function ParticipantImporter({ onParticipantsLoad, disabled, children }: 
         const firstNameIndex = header.indexOf('first_name');
         const lastNameIndex = header.indexOf('last_name');
         const nameIndex = header.indexOf('name');
+        const displayNameIndex = header.indexOf('displayName');
 
-        if (nameIndex === -1) {
+
+        if (nameIndex === -1 && displayNameIndex === -1 && (firstNameIndex === -1 || lastNameIndex === -1)) {
             toast({
                 title: "Import Failed",
-                description: "CSV must contain a 'name' column.",
+                description: "CSV must contain a 'name' column, a 'displayName' column, or 'first_name' and 'last_name' columns.",
                 variant: "destructive"
             });
             return;
@@ -51,19 +53,41 @@ export function ParticipantImporter({ onParticipantsLoad, disabled, children }: 
           .map((line, index) => {
             if (!line.trim()) return null;
             const data = line.split(',').map(s => s.trim().replace(/"/g, ''));
+            
             const firstName = firstNameIndex !== -1 ? data[firstNameIndex] : '';
             const lastName = lastNameIndex !== -1 ? data[lastNameIndex] : '';
-            const name = data[nameIndex];
-            
-            if (name) {
-              const displayName = (firstName && lastName) ? `${firstName} ${lastName}` : name;
+            const name = nameIndex !== -1 ? data[nameIndex] : '';
+            const displayName = displayNameIndex !== -1 ? data[displayNameIndex] : '';
+
+            if (displayName) {
+              const nameParts = displayName.split(' ');
               return {
-                id: `${name}-${index}`,
-                name: firstName || name.split(' ')[0],
-                lastName: lastName || name.split(' ').slice(1).join(' '),
+                id: `${displayName.toLowerCase().replace(/\s+/g, '-')}-${index}`,
+                name: nameParts[0],
+                lastName: nameParts.slice(1).join(' '),
                 displayName: displayName,
               };
             }
+            
+            if (name) {
+              const nameParts = name.split(' ');
+              return {
+                id: `${name.toLowerCase().replace(/\s+/g, '-')}-${index}`,
+                name: nameParts[0],
+                lastName: nameParts.slice(1).join(' '),
+                displayName: name,
+              };
+            }
+
+            if (firstName && lastName) {
+               return {
+                id: `${firstName.toLowerCase()}-${lastName.toLowerCase()}-${index}`,
+                name: firstName,
+                lastName: lastName,
+                displayName: `${firstName} ${lastName}`,
+              };
+            }
+
             return null;
           })
           .filter((p): p is Participant => p !== null);
@@ -91,7 +115,7 @@ export function ParticipantImporter({ onParticipantsLoad, disabled, children }: 
     };
     reader.onerror = () => {
        toast({
-          title: "File Read Error",
+          title: "File ReadError",
           description: "There was an error reading your file.",
           variant: "destructive"
         });

@@ -12,7 +12,7 @@ import { useParticipants } from '@/context/ParticipantsContext';
 import { Confetti } from '@/components/raffle/Confetti';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import Image from 'next/image';
-import { collection, addDocs, writeBatch, doc } from 'firebase/firestore';
+import { collection, writeBatch, doc } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 
 const initialLogo = PlaceHolderImages.find(img => img.id === 'mcp-logo');
@@ -34,6 +34,10 @@ export default function Home() {
     
     if (uniqueNew.length > 0) {
        try {
+        if (!firestore) {
+          toast({ title: "Database not connected", description: "Please try again later.", variant: "destructive"});
+          return;
+        }
         const batch = writeBatch(firestore);
         const participantsCol = collection(firestore, 'participants');
         uniqueNew.forEach(participant => {
@@ -62,7 +66,6 @@ export default function Home() {
        toast({
         title: "No New Participants",
         description: "The imported participants are already in the raffle.",
-        variant: "destructive"
       });
     }
   };

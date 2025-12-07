@@ -21,21 +21,18 @@ export function ParticipantsProvider({ children }: { children: ReactNode }) {
   
   useEffect(() => {
     if (firestoreParticipants) {
-      // Find which participants are new
-      const newParticipants = firestoreParticipants.filter(fp => !allParticipants.some(ap => ap.id === fp.id));
-      
-      if (newParticipants.length > 0) {
-        setAllParticipants(prev => [...prev, ...newParticipants]);
-        
-        // Add new participants to available list, but don't re-add existing ones
-        const currentAvailableIds = new Set(availableParticipants.map(p => p.id));
-        const newlyAvailable = newParticipants.filter(p => !currentAvailableIds.has(p.id));
-        if (newlyAvailable.length > 0) {
-          setAvailableParticipants(prev => [...prev, ...newlyAvailable]);
+        setAllParticipants(firestoreParticipants);
+        // On initial load or full refresh, set available to all
+        // To prevent losing the "available" list on hot-reloads, we check if it's empty
+        if (availableParticipants.length === 0) {
+            setAvailableParticipants(firestoreParticipants);
+        } else {
+            // Reconcile available participants with the main list
+            const firestoreIds = new Set(firestoreParticipants.map(p => p.id));
+            setAvailableParticipants(prev => prev.filter(p => firestoreIds.has(p.id)));
         }
-      }
     }
-  }, [firestoreParticipants, allParticipants, availableParticipants]);
+  }, [firestoreParticipants]);
 
 
   return (
