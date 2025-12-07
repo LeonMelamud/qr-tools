@@ -89,6 +89,7 @@ export default function Home() {
               disabled={isRaffling || availableParticipants.length === 0}
               size="lg"
               className="font-bold text-lg"
+              variant="default"
             >
               <Trophy className="mr-2 h-5 w-5" />
               Start Raffle
@@ -96,7 +97,7 @@ export default function Home() {
           </div>
         </div>
 
-        <footer className="text-center text-primary-foreground/80 mt-8">
+        <footer className="text-center text-foreground/80 mt-8">
           <p>Participants: {participantCount} | Available for this round: {availableCount}</p>
         </footer>
       </main>

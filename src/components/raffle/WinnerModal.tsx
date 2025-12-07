@@ -21,7 +21,7 @@ interface WinnerModalProps {
 export function WinnerModal({ open, onOpenChange, winner, onNextRound }: WinnerModalProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg bg-card/80 backdrop-blur-md border-primary text-center overflow-hidden">
+      <DialogContent className="max-w-lg bg-background/80 backdrop-blur-md border-primary text-center overflow-hidden">
         <Confetti isCelebrating={open} />
         <DialogHeader className="z-10 mt-8">
           <DialogTitle className="text-3xl text-primary font-headline tracking-widest uppercase">

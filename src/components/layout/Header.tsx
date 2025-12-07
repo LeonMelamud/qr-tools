@@ -17,7 +17,7 @@ export function Header() {
             data-ai-hint={logo.imageHint}
           />
         )}
-        <h1 className="text-4xl md:text-5xl font-bold tracking-tighter text-foreground font-headline">
+        <h1 className="text-4xl md:text-5xl font-bold tracking-tighter text-primary font-headline">
           HypnoRaffle
         </h1>
       </div>

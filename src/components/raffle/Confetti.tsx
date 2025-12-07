@@ -23,7 +23,7 @@ export function Confetti({ isCelebrating }: { isCelebrating: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationFrameId = useRef<number>();
   const particles = useRef<Particle[]>([]);
-  const themeColors = ['#FFC629', '#FFFFFF', '#212121'];
+  const themeColors = ['#FFC629', '#FFFFFF', '#333333']; // Bumble yellow, white, dark gray
 
   const resetParticles = useCallback(() => {
     const canvas = canvasRef.current;
