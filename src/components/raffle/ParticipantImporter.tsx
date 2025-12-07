@@ -37,6 +37,7 @@ export function ParticipantImporter({ onParticipantsLoad, disabled, children }: 
         const lastNameIndex = header.indexOf('last_name');
         const nameIndex = header.indexOf('name');
         const displayNameIndex = header.indexOf('display_name');
+        const emailIndex = header.indexOf('email');
 
 
         if (nameIndex === -1 && displayNameIndex === -1 && (firstNameIndex === -1 || lastNameIndex === -1)) {
@@ -50,7 +51,7 @@ export function ParticipantImporter({ onParticipantsLoad, disabled, children }: 
 
         const newParticipants: Participant[] = lines
           .slice(1)
-          .map((line, index) => {
+          .map((line, index): Participant | null => {
             if (!line.trim()) return null;
             const data = line.split(',').map(s => s.trim().replace(/"/g, ''));
 
@@ -58,6 +59,7 @@ export function ParticipantImporter({ onParticipantsLoad, disabled, children }: 
             const lastName = lastNameIndex !== -1 ? data[lastNameIndex] : '';
             const name = nameIndex !== -1 ? data[nameIndex] : '';
             const displayName = displayNameIndex !== -1 ? data[displayNameIndex] : '';
+            const email = emailIndex !== -1 ? data[emailIndex] : undefined;
 
             if (displayName) {
               const nameParts = displayName.split(' ');
@@ -66,6 +68,7 @@ export function ParticipantImporter({ onParticipantsLoad, disabled, children }: 
                 name: nameParts[0],
                 last_name: nameParts.slice(1).join(' '),
                 display_name: displayName,
+                email,
               };
             }
 
@@ -76,6 +79,7 @@ export function ParticipantImporter({ onParticipantsLoad, disabled, children }: 
                 name: nameParts[0],
                 last_name: nameParts.slice(1).join(' '),
                 display_name: name,
+                email,
               };
             }
 
@@ -85,6 +89,7 @@ export function ParticipantImporter({ onParticipantsLoad, disabled, children }: 
                 name: firstName,
                 last_name: lastName,
                 display_name: `${firstName} ${lastName}`,
+                email,
               };
             }
 
@@ -129,7 +134,7 @@ export function ParticipantImporter({ onParticipantsLoad, disabled, children }: 
 
   return (
     <>
-      {React.cloneElement(children, { onClick: triggerFileInput, disabled })}
+      {React.cloneElement(children as React.ReactElement<any>, { onClick: triggerFileInput, disabled })}
       <input
         type="file"
         ref={fileInputRef}

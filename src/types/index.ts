@@ -10,5 +10,6 @@ export interface Participant {
   last_name: string;
   display_name: string;
   session_id?: string;
+  email?: string;
 }
 

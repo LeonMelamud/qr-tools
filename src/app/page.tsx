@@ -65,6 +65,7 @@ export default function Home() {
           last_name: participant.last_name,
           display_name: participant.display_name,
           session_id: sessionId,
+          email: participant.email,
         }));
 
         const { error } = await supabase.from('participants').insert(participantsToInsert);
@@ -252,6 +253,14 @@ export default function Home() {
             )}
 
           </div>
+
+          {spinHasEnded && winner && (
+            <div className="w-full text-center animate-in fade-in slide-in-from-bottom-4 duration-700">
+              <p className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/60">
+                {winner.email || winner.display_name}
+              </p>
+            </div>
+          )}
         </div>
 
         <footer className="text-center text-foreground/80 mt-8">
