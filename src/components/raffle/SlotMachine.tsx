@@ -80,17 +80,17 @@ export function SlotMachine({ participants, winner, isSpinning, onSpinEnd }: Slo
   const hasParticipants = shuffledParticipants.length > 0;
 
   return (
-    <div className="relative h-[15rem] w-full max-w-lg overflow-hidden bg-background/30 rounded-2xl shadow-2xl">
+    <div className="relative h-[15rem] w-full max-w-lg overflow-hidden bg-background rounded-2xl shadow-2xl">
       <div 
         className="absolute top-1/2 left-0 right-0 h-[5rem] -translate-y-1/2 rounded-lg border-2 border-primary/80 shadow-[0_0_20px_3px_var(--tw-shadow-color)] shadow-primary/70 z-20 pointer-events-none" 
         aria-hidden="true" 
       />
       <div 
-        className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-background/80 via-background/60 to-transparent z-10 pointer-events-none" 
+        className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-background/90 via-background/70 to-transparent z-10 pointer-events-none" 
         aria-hidden="true" 
       />
       <div 
-        className="absolute bottom-0 left-0 right-0 h-1/2 bg-gradient-to-t from-background/80 via-background/60 to-transparent z-10 pointer-events-none" 
+        className="absolute bottom-0 left-0 right-0 h-1/2 bg-gradient-to-t from-background/90 via-background/70 to-transparent z-10 pointer-events-none" 
         aria-hidden="true" 
       />
 
@@ -108,14 +108,14 @@ export function SlotMachine({ participants, winner, isSpinning, onSpinEnd }: Slo
           shuffledParticipants.map((p, i) => (
             <div
               key={`${p.id}-${i}`}
-              className="h-20 flex items-center justify-center text-4xl font-bold text-primary-foreground/70"
+              className="h-20 flex items-center justify-center text-4xl font-bold text-foreground/70"
               aria-hidden={!isSpinning && winner?.id === p.id ? "false" : "true"}
             >
               {p.displayName}
             </div>
           ))
         ) : (
-          <div className="h-full flex items-center justify-center text-primary-foreground/50 text-xl">
+          <div className="h-full flex items-center justify-center text-foreground/50 text-xl">
             Add participants to begin
           </div>
         )}

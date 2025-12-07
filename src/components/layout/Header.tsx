@@ -13,11 +13,11 @@ export function Header() {
             alt={logo.description}
             width={56}
             height={56}
-            className="rounded-full shadow-lg border-2 border-primary-foreground/50"
+            className="rounded-full shadow-lg border-2 border-primary"
             data-ai-hint={logo.imageHint}
           />
         )}
-        <h1 className="text-4xl md:text-5xl font-bold tracking-tighter text-primary-foreground font-headline shadow-black/50 text-shadow">
+        <h1 className="text-4xl md:text-5xl font-bold tracking-tighter text-foreground font-headline">
           HypnoRaffle
         </h1>
       </div>
