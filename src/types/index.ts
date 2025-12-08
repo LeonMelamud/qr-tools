@@ -11,5 +11,6 @@ export interface Participant {
   display_name: string;
   session_id?: string;
   email?: string;
+  won?: boolean;
 }
 

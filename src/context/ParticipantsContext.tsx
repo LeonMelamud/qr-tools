@@ -29,24 +29,12 @@ export function ParticipantsProvider({ children }: { children: ReactNode }) {
     if (participants) {
       // Sort participants once when they are loaded/updated
       const sortedParticipants = [...participants].sort((a, b) => a.display_name.localeCompare(b.display_name));
-
-      setAllParticipants(prevAll => {
-        // Simple way to check if it's the initial load
-        if (prevAll.length === 0 && sortedParticipants.length > 0) {
-          setAvailableParticipants(sortedParticipants);
-        } else {
-          // If not initial load, try to preserve the available list
-          const updatedAvailable = sortedParticipants.filter(p =>
-            availableParticipants.some(ap => ap.id === p.id)
-          );
-          if (updatedAvailable.length > 0) {
-            setAvailableParticipants(updatedAvailable);
-          } else {
-            setAvailableParticipants(sortedParticipants);
-          }
-        }
-        return sortedParticipants;
-      });
+      
+      // Filter available based on won status from DB
+      const available = sortedParticipants.filter(p => !p.won);
+      
+      setAllParticipants(sortedParticipants);
+      setAvailableParticipants(available);
     }
   }, [participants]);
 

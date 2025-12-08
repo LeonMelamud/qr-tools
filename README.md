@@ -63,6 +63,15 @@ npm run build
 
 This acts as a verification step to ensure all static pages can be generated successfully.
 
+## How the Raffle Works
+
+1. **Add Participants**: Import participants via CSV or let them join by scanning the QR code.
+2. **Start Raffle**: Click "Start Raffle" to spin the slot machine.
+3. **Winner Selected**: When the spin ends, the winner is displayed and a webhook notification is sent (if configured).
+4. **Prepare Next Round**: Click "Prepare Next Round" to mark the winner in the database and continue to the next draw.
+5. **Winner Persistence**: Winners are marked as `won: true` in the database and will remain marked even after page refresh.
+6. **Reset Raffle**: When all participants have won, click "Reset Raffle" to start a new round with everyone available again.
+
 ## Deployment
 
 This project is configured for **GitHub Pages** deployment via GitHub Actions.

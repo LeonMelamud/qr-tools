@@ -140,6 +140,7 @@ export default function Home() {
     setSpinHasEnded(true);
 
     if (winner) {
+      // Send webhook notification
       const webhookUrl = process.env.NEXT_PUBLIC_WINNER_WEBHOOK_URL;
       if (webhookUrl) {
         try {
@@ -164,10 +165,24 @@ export default function Home() {
     }
   };
 
-  const handleNextRound = () => {
+  const handleNextRound = async () => {
     setSpinHasEnded(false);
     setIsRaffling(false);
     if (winner) {
+      // Mark winner in database
+      try {
+        const { error } = await supabase
+          .from('participants')
+          .update({ won: true })
+          .eq('id', winner.id);
+        
+        if (error) {
+          console.error('Failed to mark winner in DB:', error);
+        }
+      } catch (err) {
+        console.error('Failed to mark winner in DB:', err);
+      }
+
       const remaining = availableParticipants.filter(p => p.id !== winner.id);
       setAvailableParticipants(remaining);
 
@@ -177,6 +192,15 @@ export default function Home() {
           title: 'Round Complete!',
           description: 'All participants have been chosen. Resetting for a new round.',
         });
+        // Reset all winners in DB
+        try {
+          await supabase
+            .from('participants')
+            .update({ won: false })
+            .eq('session_id', sessionId);
+        } catch (err) {
+          console.error('Failed to reset winners in DB:', err);
+        }
         setAvailableParticipants(allParticipants);
       }
     }
@@ -192,7 +216,16 @@ export default function Home() {
     }
   };
 
-  const handleResetRaffle = () => {
+  const handleResetRaffle = async () => {
+    // Reset all winners in DB
+    try {
+      await supabase
+        .from('participants')
+        .update({ won: false })
+        .eq('session_id', sessionId);
+    } catch (err) {
+      console.error('Failed to reset winners in DB:', err);
+    }
     setAvailableParticipants(allParticipants);
     setWinner(null);
     setIsRaffling(false);
@@ -249,7 +282,7 @@ export default function Home() {
           />
 
           <SlotMachine
-            participants={allParticipants}
+            participants={availableParticipants}
             winner={winner}
             isSpinning={isRaffling}
             onSpinEnd={handleSpinEnd}
