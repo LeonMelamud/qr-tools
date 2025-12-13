@@ -21,9 +21,9 @@ type Particle = {
 
 const themeColors = ['#FFC629', '#FFFFFF', '#333333']; // Bumble yellow, white, dark gray
 
-export function Confetti({ isCelebrating, image }: { isCelebrating: boolean, image?: string }) {
+export function Confetti({ isCelebrating, image }: { isCelebrating: boolean; image?: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animationFrameId = useRef<number>();
+  const animationFrameId = useRef<number | undefined>(undefined);
   const particles = useRef<Particle[]>([]);
   const logoImageRef = useRef<HTMLImageElement | null>(null);
   const imageRef = useRef<string | undefined>(image);

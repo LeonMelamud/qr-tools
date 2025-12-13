@@ -87,7 +87,8 @@ export interface QRDownloadOptions {
   gradient?: string[]; // Array of colors for gradient QR
   logoUrl?: string; // Base64 or URL of logo to embed in center
   logoShape?: 'square' | 'circle'; // Shape of logo container
-  logoScale?: number; // Scale factor for logo size (0.5 to 1.5, default 1.0)
+  logoScale?: number; // Scale factor for border/container size (0.5 to 1.5, default 1.0)
+  logoCrop?: number; // Scale factor for image crop/zoom (0.5 to 1.5, default 1.0)
 }
 
 // Download QR code as PNG or SVG with title, description, and colors
@@ -107,7 +108,8 @@ export function downloadQRCode(format: 'png' | 'svg', options: QRDownloadOptions
     gradient,
     logoUrl,
     logoShape = 'circle',
-    logoScale = 1.0
+    logoScale = 1.0,
+    logoCrop = 1.0
   } = opts;
 
   const svg = document.getElementById('qr-code-svg');
@@ -190,22 +192,22 @@ export function downloadQRCode(format: 'png' | 'svg', options: QRDownloadOptions
 
   if (format === 'svg') {
     // Create decorated SVG with title and description
-    const decoratedSvg = createDecoratedSVG(svgData, { title, description, fgColor, bgColor, accentColor, gradient, logoUrl, logoShape, logoScale });
+    const decoratedSvg = createDecoratedSVG(svgData, { title, description, fgColor, bgColor, accentColor, gradient, logoUrl, logoShape, logoScale, logoCrop });
     const blob = new Blob([decoratedSvg], { type: 'image/svg+xml' });
     const url = URL.createObjectURL(blob);
     triggerDownload(url, `${slug}_qr.svg`);
     URL.revokeObjectURL(url);
   } else {
     // Create decorated PNG - pass gradient so we can apply it on canvas
-    createDecoratedPNG(svgData, { title, description, slug, fgColor, bgColor, accentColor, gradient, logoUrl, logoShape, logoScale });
+    createDecoratedPNG(svgData, { title, description, slug, fgColor, bgColor, accentColor, gradient, logoUrl, logoShape, logoScale, logoCrop });
   }
 }
 
 function createDecoratedSVG(
   qrSvgData: string, 
-  opts: { title?: string; description?: string; fgColor: string; bgColor: string; accentColor: string; gradient?: string[]; logoUrl?: string; logoShape?: 'square' | 'circle'; logoScale?: number }
+  opts: { title?: string; description?: string; fgColor: string; bgColor: string; accentColor: string; gradient?: string[]; logoUrl?: string; logoShape?: 'square' | 'circle'; logoScale?: number; logoCrop?: number }
 ): string {
-  const { title, description, fgColor, bgColor, accentColor, gradient, logoUrl, logoShape = 'circle', logoScale = 1.0 } = opts;
+  const { title, description, fgColor, bgColor, accentColor, gradient, logoUrl, logoShape = 'circle', logoScale = 1.0, logoCrop = 1.0 } = opts;
   
   const hasTitle = !!title;
   const hasDesc = !!description;
@@ -228,14 +230,18 @@ function createDecoratedSVG(
   const titleColor = gradient && gradient.length > 0 ? gradient[0] : fgColor;
   const descColor = gradient && gradient.length > 1 ? gradient[gradient.length - 1] : accentColor;
   
-  // Logo in center of QR - base size scaled by logoScale
+  // Logo in center of QR - logoScale controls container size, logoCrop controls image zoom
   const baseLogoSize = 70; // Base size ~23% of QR
-  const logoSize = Math.round(baseLogoSize * logoScale);
+  const logoContainerSize = Math.round(baseLogoSize * logoScale); // Container resizes with logoScale
   const logoCenterX = padding + qrSize / 2;
   const logoCenterY = titleHeight + padding + qrSize / 2;
   const logoClipPath = logoShape === 'circle' 
-    ? `<clipPath id="logoClip"><circle cx="${logoCenterX}" cy="${logoCenterY}" r="${logoSize / 2 - 2}"/></clipPath>`
-    : `<clipPath id="logoClip"><rect x="${logoCenterX - logoSize / 2 + 2}" y="${logoCenterY - logoSize / 2 + 2}" width="${logoSize - 4}" height="${logoSize - 4}" rx="4"/></clipPath>`;
+    ? `<clipPath id="logoClip"><circle cx="${logoCenterX}" cy="${logoCenterY}" r="${logoContainerSize / 2 - 2}"/></clipPath>`
+    : `<clipPath id="logoClip"><rect x="${logoCenterX - logoContainerSize / 2 + 2}" y="${logoCenterY - logoContainerSize / 2 + 2}" width="${logoContainerSize - 4}" height="${logoContainerSize - 4}" rx="4"/></clipPath>`;
+  
+  // Calculate scaled image size for zoom effect using logoCrop
+  const scaledImageSize = Math.round((logoContainerSize - 4) * logoCrop);
+  const imageOffset = (logoContainerSize - 4 - scaledImageSize) / 2;
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${totalWidth}" height="${totalHeight}" viewBox="0 0 ${totalWidth} ${totalHeight}">
@@ -278,17 +284,17 @@ function createDecoratedSVG(
   <!-- Logo in center -->
   <${logoShape === 'circle' ? 'circle' : 'rect'} 
     ${logoShape === 'circle' 
-      ? `cx="${logoCenterX}" cy="${logoCenterY}" r="${logoSize / 2}"` 
-      : `x="${logoCenterX - logoSize / 2}" y="${logoCenterY - logoSize / 2}" width="${logoSize}" height="${logoSize}" rx="6"`
+      ? `cx="${logoCenterX}" cy="${logoCenterY}" r="${logoContainerSize / 2}"` 
+      : `x="${logoCenterX - logoContainerSize / 2}" y="${logoCenterY - logoContainerSize / 2}" width="${logoContainerSize}" height="${logoContainerSize}" rx="6"`
     }
     fill="white" 
     stroke="${gradient?.[0] || accentColor}" 
     stroke-width="2"/>
   <image 
-    x="${logoCenterX - logoSize / 2 + 2}" 
-    y="${logoCenterY - logoSize / 2 + 2}" 
-    width="${logoSize - 4}" 
-    height="${logoSize - 4}" 
+    x="${logoCenterX - logoContainerSize / 2 + 2 + imageOffset}" 
+    y="${logoCenterY - logoContainerSize / 2 + 2 + imageOffset}" 
+    width="${scaledImageSize}" 
+    height="${scaledImageSize}" 
     xlink:href="${logoUrl}"
     clip-path="url(#logoClip)"
     preserveAspectRatio="xMidYMid slice"/>
@@ -309,7 +315,7 @@ function createDecoratedPNG(
   qrSvgData: string,
   opts: QRDownloadOptions
 ) {
-  const { title, description, slug, fgColor = '#1a1a2e', bgColor = '#ffffff', accentColor = '#6366f1', gradient, logoUrl, logoShape = 'circle', logoScale = 1.0 } = opts;
+  const { title, description, slug, fgColor = '#1a1a2e', bgColor = '#ffffff', accentColor = '#6366f1', gradient, logoUrl, logoShape = 'circle', logoScale = 1.0, logoCrop = 1.0 } = opts;
   
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d')!;
@@ -463,12 +469,23 @@ function createDecoratedPNG(
       ctx.drawImage(tempCanvas, padding, titleHeight + padding, qrSize, qrSize);
     }
     
-    // Helper function to draw logo on canvas
+    // Helper function to draw logo on canvas with crop/zoom effect
     const drawLogo = (logoImg: HTMLImageElement) => {
       const baseLogoSize = 90; // Base size ~22% of QR
-      const logoSize = Math.round(baseLogoSize * logoScale);
+      const logoContainerSize = Math.round(baseLogoSize * logoScale); // Container resizes with logoScale
       const logoCenterX = padding + qrSize / 2;
       const logoCenterY = titleHeight + padding + qrSize / 2;
+      
+      // Calculate source crop region based on logoCrop
+      const imgWidth = logoImg.naturalWidth;
+      const imgHeight = logoImg.naturalHeight;
+      
+      // Crop from center: show 1/logoCrop portion of image
+      const cropRatio = 1 / logoCrop;
+      const sWidth = Math.round(imgWidth * cropRatio);
+      const sHeight = Math.round(imgHeight * cropRatio);
+      const sx = Math.round((imgWidth - sWidth) / 2);
+      const sy = Math.round((imgHeight - sHeight) / 2);
       
       // White background circle/square with border
       ctx.fillStyle = 'white';
@@ -477,27 +494,39 @@ function createDecoratedPNG(
       
       if (logoShape === 'circle') {
         ctx.beginPath();
-        ctx.arc(logoCenterX, logoCenterY, logoSize / 2 + 4, 0, Math.PI * 2);
+        ctx.arc(logoCenterX, logoCenterY, logoContainerSize / 2 + 4, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
         
         // Clip to circle and draw logo
         ctx.save();
         ctx.beginPath();
-        ctx.arc(logoCenterX, logoCenterY, logoSize / 2, 0, Math.PI * 2);
+        ctx.arc(logoCenterX, logoCenterY, logoContainerSize / 2, 0, Math.PI * 2);
         ctx.clip();
-        ctx.drawImage(logoImg, logoCenterX - logoSize / 2, logoCenterY - logoSize / 2, logoSize, logoSize);
+        
+        // Draw with crop/zoom using 9-argument drawImage
+        ctx.drawImage(
+          logoImg, 
+          sx, sy, sWidth, sHeight,  // Source crop region
+          logoCenterX - logoContainerSize / 2, logoCenterY - logoContainerSize / 2, logoContainerSize, logoContainerSize  // Destination
+        );
         ctx.restore();
       } else {
-        roundRect(ctx, logoCenterX - logoSize / 2 - 4, logoCenterY - logoSize / 2 - 4, logoSize + 8, logoSize + 8, 8);
+        roundRect(ctx, logoCenterX - logoContainerSize / 2 - 4, logoCenterY - logoContainerSize / 2 - 4, logoContainerSize + 8, logoContainerSize + 8, 8);
         ctx.fill();
         ctx.stroke();
         
         // Clip to rounded rect and draw logo
         ctx.save();
-        roundRect(ctx, logoCenterX - logoSize / 2, logoCenterY - logoSize / 2, logoSize, logoSize, 6);
+        roundRect(ctx, logoCenterX - logoContainerSize / 2, logoCenterY - logoContainerSize / 2, logoContainerSize, logoContainerSize, 6);
         ctx.clip();
-        ctx.drawImage(logoImg, logoCenterX - logoSize / 2, logoCenterY - logoSize / 2, logoSize, logoSize);
+        
+        // Draw with crop/zoom using 9-argument drawImage
+        ctx.drawImage(
+          logoImg, 
+          sx, sy, sWidth, sHeight,  // Source crop region
+          logoCenterX - logoContainerSize / 2, logoCenterY - logoContainerSize / 2, logoContainerSize, logoContainerSize  // Destination
+        );
         ctx.restore();
       }
     };

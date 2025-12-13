@@ -160,7 +160,8 @@ export default function QRRefPage() {
   const [qrStyle, setQrStyle] = useState<QRStyle>(QR_STYLES[0]);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [logoShape, setLogoShape] = useState<'square' | 'circle'>('circle');
-  const [logoScale, setLogoScale] = useState<number>(1.0); // 0.5 to 1.5
+  const [logoScale, setLogoScale] = useState<number>(1.0); // Border/container size: 0.5 to 1.5
+  const [logoCrop, setLogoCrop] = useState<number>(1.0); // Image crop/zoom: 0.5 to 1.5
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -342,6 +343,7 @@ export default function QRRefPage() {
       logoUrl: logoUrl || undefined,
       logoShape,
       logoScale,
+      logoCrop,
     };
     downloadQRCode(format, options);
     toast({ title: "Downloaded!", description: `QR code saved as ${format.toUpperCase()}.` });
@@ -545,14 +547,18 @@ export default function QRRefPage() {
                         style={{ pointerEvents: 'none' }}
                       >
                         <div 
-                          className={`bg-white p-1 shadow-md ${logoShape === 'circle' ? 'rounded-full' : 'rounded-lg'}`}
-                          style={{ transform: `scale(${logoScale})` }}
+                          className={`bg-white p-1 shadow-md overflow-hidden ${logoShape === 'circle' ? 'rounded-full' : 'rounded-lg'}`}
+                          style={{ width: `${60 * logoScale}px`, height: `${60 * logoScale}px` }}
                         >
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img 
                             src={logoUrl} 
                             alt="Logo" 
-                            className={`w-14 h-14 object-contain ${logoShape === 'circle' ? 'rounded-full' : 'rounded'}`}
+                            className={`w-full h-full object-cover ${logoShape === 'circle' ? 'rounded-full' : 'rounded'}`}
+                            style={{ 
+                              transform: `scale(${logoCrop})`,
+                              transformOrigin: 'center'
+                            }}
                           />
                         </div>
                       </div>
@@ -614,20 +620,35 @@ export default function QRRefPage() {
                         </>
                       )}
                     </div>
-                    {/* Logo Size Slider */}
+                    {/* Logo Size & Crop Sliders */}
                     {logoUrl && (
-                      <div className="flex items-center gap-2 mt-2">
-                        <span className="text-xs text-muted-foreground">Size:</span>
-                        <input
-                          type="range"
-                          min="0.5"
-                          max="1.5"
-                          step="0.1"
-                          value={logoScale}
-                          onChange={(e) => setLogoScale(parseFloat(e.target.value))}
-                          className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary"
-                        />
-                        <span className="text-xs text-muted-foreground w-8">{Math.round(logoScale * 100)}%</span>
+                      <div className="space-y-2 mt-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground w-10">Size:</span>
+                          <input
+                            type="range"
+                            min="0.5"
+                            max="1.5"
+                            step="0.1"
+                            value={logoScale}
+                            onChange={(e) => setLogoScale(parseFloat(e.target.value))}
+                            className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary"
+                          />
+                          <span className="text-xs text-muted-foreground w-8">{Math.round(logoScale * 100)}%</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground w-10">Crop:</span>
+                          <input
+                            type="range"
+                            min="0.5"
+                            max="1.5"
+                            step="0.1"
+                            value={logoCrop}
+                            onChange={(e) => setLogoCrop(parseFloat(e.target.value))}
+                            className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary"
+                          />
+                          <span className="text-xs text-muted-foreground w-8">{Math.round(logoCrop * 100)}%</span>
+                        </div>
                       </div>
                     )}
                   </div>
