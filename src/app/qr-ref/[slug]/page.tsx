@@ -174,6 +174,4 @@ export default function QRRefRedirectPage() {
   );
 }
 
-export async function generateStaticParams() {
-  return [];
-}
+
