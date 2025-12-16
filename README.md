@@ -76,7 +76,10 @@ This acts as a verification step to ensure all static pages can be generated suc
 
 This project is configured for **GitHub Pages** deployment via GitHub Actions.
 
-1.  **Push to `main`**: Any push to the `main` branch triggers the deployment workflow.
+1.  **Push to `main` (Personal Remote)**: Push to the `main` branch of the personal repository (`git@github.com:LeonMelamud/QR-Tools.git`) to trigger the deployment workflow.
+    ```bash
+    git push personal main
+    ```
 2.  **Secrets**: The GitHub Repository Environment `github-pages` must have the following secrets configured under **Settings → Secrets and variables → Actions**:
     - `NEXT_PUBLIC_SUPABASE_URL` - Your Supabase project URL
     - `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Your Supabase anonymous key

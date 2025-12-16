@@ -13,7 +13,7 @@ This document provides guidance for AI agents working on the HypnoRaffle codebas
 - **Styling**: Tailwind CSS with shadcn/ui components
 - **Database**: Supabase (PostgreSQL with real-time subscriptions)
 - **AI Integration**: Google Genkit (optional)
-- **Deployment**: GitHub Pages (static export)
+- **Deployment**: GitHub Pages (static export) via personal GitHub remote (`LeonMelamud/QR-Tools`)
 
 ## Project Structure
 

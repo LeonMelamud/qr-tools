@@ -4,8 +4,7 @@ const nextConfig: NextConfig = {
   /* config options here */
   /* config options here */
   output: 'export',
-  // base path for github pages
-  // basePath: process.env.NODE_ENV === 'production' ? '/qr-tools' : '',
+
 
   typescript: {
     ignoreBuildErrors: true,

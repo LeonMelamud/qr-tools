@@ -7,8 +7,8 @@ import { ParticipantsProvider } from '@/context/ParticipantsContext';
 import { QrModalProvider } from '@/context/QrModalContext';
 
 export const metadata: Metadata = {
-  title: 'HypnoRaffle',
-  description: 'A hypnotic raffle experience',
+  title: 'QR Tools',
+  description: 'QR Code Utilities and Raffle System',
 };
 
 export default function RootLayout({
