@@ -42,7 +42,7 @@ export function parseUserAgent(ua: string) {
 // Fetch IP geolocation data
 export async function getGeoData() {
   try {
-    const response = await fetch('https://ipapi.co/json/', { 
+    const response = await fetch('https://ipapi.co/json/', {
       cache: 'no-store',
       signal: AbortSignal.timeout(3000)
     });
@@ -94,14 +94,14 @@ export interface QRDownloadOptions {
 // Download QR code as PNG or SVG with title, description, and colors
 export function downloadQRCode(format: 'png' | 'svg', options: QRDownloadOptions | string) {
   // Support legacy string parameter (just slug)
-  const opts: QRDownloadOptions = typeof options === 'string' 
-    ? { slug: options } 
+  const opts: QRDownloadOptions = typeof options === 'string'
+    ? { slug: options }
     : options;
-  
-  const { 
-    title, 
-    description, 
-    slug, 
+
+  const {
+    title,
+    description,
+    slug,
     fgColor = '#1a1a2e',
     bgColor = '#ffffff',
     accentColor = '#6366f1',
@@ -117,24 +117,24 @@ export function downloadQRCode(format: 'png' | 'svg', options: QRDownloadOptions
 
   // Clone the SVG
   const svgClone = svg.cloneNode(true) as SVGElement;
-  
+
   // Ensure SVG has proper dimensions for rendering
   svgClone.setAttribute('width', '256');
   svgClone.setAttribute('height', '256');
-  
+
   // Remove any existing defs to avoid conflicts
   const existingDefs = svgClone.querySelector('defs');
   if (existingDefs) existingDefs.remove();
-  
+
   // For PNG export: always use solid black for QR paths (we'll apply gradient on canvas)
   // For SVG export: embed the gradient definition
-  
+
   if (format === 'png') {
     // For PNG: Replace all fills with solid black (for canvas masking)
     // The QR code SVG has two paths: one for bg (white) and one for fg (qr pattern)
     // We need the fg path to be black so we can detect it in pixel manipulation
     const whiteFills = ['#ffffff', '#fff', 'white'];
-    
+
     svgClone.querySelectorAll('path, rect').forEach(el => {
       const fill = (el.getAttribute('fill') || '').toLowerCase().trim();
       // If it's not a white fill, make it black
@@ -154,30 +154,38 @@ export function downloadQRCode(format: 'png' | 'svg', options: QRDownloadOptions
       linearGradient.setAttribute('y1', '0%');
       linearGradient.setAttribute('x2', '100%');
       linearGradient.setAttribute('y2', '100%');
-      
+
       gradient.forEach((color, i) => {
         const stop = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
         stop.setAttribute('offset', `${(i / (gradient.length - 1)) * 100}%`);
         stop.setAttribute('stop-color', color);
         linearGradient.appendChild(stop);
       });
-      
+
       defs.appendChild(linearGradient);
       svgClone.insertBefore(defs, svgClone.firstChild);
-      
+
       // Apply gradient to paths
-      svgClone.querySelectorAll('path').forEach(path => {
-        const fill = path.getAttribute('fill');
-        if (fill && fill !== '#ffffff' && fill !== 'white' && fill !== 'none' && fill !== 'transparent') {
+      svgClone.querySelectorAll('path, rect, circle, polygon').forEach(path => {
+        const fill = (path.getAttribute('fill') || '').toLowerCase();
+        const style = (path.getAttribute('style') || '').toLowerCase();
+        const isWhite = ['#ffffff', '#fff', 'white'].includes(fill) || style.includes('fill: white') || style.includes('fill: #ffffff') || style.includes('fill: #fff');
+
+        if (!isWhite && fill !== 'none' && fill !== 'transparent') {
           path.setAttribute('fill', 'url(#qrGradientExport)');
+          (path as HTMLElement).style.fill = ''; // Remove inline style to ensure attribute priority
         }
       });
     } else {
       // Solid color for SVG
-      svgClone.querySelectorAll('path').forEach(path => {
-        const fill = path.getAttribute('fill');
-        if (fill && fill !== '#ffffff' && fill !== 'white' && fill !== 'none' && fill !== 'transparent') {
+      svgClone.querySelectorAll('path, rect, circle, polygon').forEach(path => {
+        const fill = (path.getAttribute('fill') || '').toLowerCase();
+        const style = (path.getAttribute('style') || '').toLowerCase();
+        const isWhite = ['#ffffff', '#fff', 'white'].includes(fill) || style.includes('fill: white') || style.includes('fill: #ffffff') || style.includes('fill: #fff');
+
+        if (!isWhite && fill !== 'none' && fill !== 'transparent') {
           path.setAttribute('fill', fgColor);
+          (path as HTMLElement).style.fill = ''; // Remove inline style to ensure attribute priority
         }
       });
     }
@@ -187,12 +195,15 @@ export function downloadQRCode(format: 'png' | 'svg', options: QRDownloadOptions
   if (!svgClone.getAttribute('xmlns')) {
     svgClone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
   }
-  
+
+  // Get viewBox before serialization to preserve coordinate system
+  const viewBox = svgClone.getAttribute('viewBox') || '0 0 256 256';
+
   const svgData = new XMLSerializer().serializeToString(svgClone);
 
   if (format === 'svg') {
     // Create decorated SVG with title and description
-    const decoratedSvg = createDecoratedSVG(svgData, { title, description, fgColor, bgColor, accentColor, gradient, logoUrl, logoShape, logoScale, logoCrop });
+    const decoratedSvg = createDecoratedSVG(svgData, { title, description, fgColor, bgColor, accentColor, gradient, logoUrl, logoShape, logoScale, logoCrop, viewBox });
     const blob = new Blob([decoratedSvg], { type: 'image/svg+xml' });
     const url = URL.createObjectURL(blob);
     triggerDownload(url, `${slug}_qr.svg`);
@@ -204,11 +215,11 @@ export function downloadQRCode(format: 'png' | 'svg', options: QRDownloadOptions
 }
 
 function createDecoratedSVG(
-  qrSvgData: string, 
-  opts: { title?: string; description?: string; fgColor: string; bgColor: string; accentColor: string; gradient?: string[]; logoUrl?: string; logoShape?: 'square' | 'circle'; logoScale?: number; logoCrop?: number }
+  qrSvgData: string,
+  opts: { title?: string; description?: string; fgColor: string; bgColor: string; accentColor: string; gradient?: string[]; logoUrl?: string; logoShape?: 'square' | 'circle'; logoScale?: number; logoCrop?: number; viewBox?: string }
 ): string {
-  const { title, description, fgColor, bgColor, accentColor, gradient, logoUrl, logoShape = 'circle', logoScale = 1.0, logoCrop = 1.0 } = opts;
-  
+  const { title, description, fgColor, bgColor, accentColor, gradient, logoUrl, logoShape = 'circle', logoScale = 1.0, logoCrop = 1.0, viewBox = '0 0 256 256' } = opts;
+
   const hasTitle = !!title;
   const hasDesc = !!description;
   const titleHeight = hasTitle ? 60 : 0;
@@ -220,7 +231,7 @@ function createDecoratedSVG(
 
   // Extract inner content from QR SVG
   const qrContent = qrSvgData.replace(/<\?xml[^>]*\?>/, '').replace(/<svg[^>]*>/, '').replace(/<\/svg>/, '');
-  
+
   // Build gradient stops for header
   const headerGradientStops = gradient && gradient.length > 1
     ? gradient.map((color, i) => `<stop offset="${(i / (gradient.length - 1)) * 100}%" style="stop-color:${color};stop-opacity:1" />`).join('\n      ')
@@ -229,17 +240,17 @@ function createDecoratedSVG(
 
   const titleColor = gradient && gradient.length > 0 ? gradient[0] : fgColor;
   const descColor = gradient && gradient.length > 1 ? gradient[gradient.length - 1] : accentColor;
-  
+
   // Logo in center of QR - logoScale controls container size, logoCrop controls image zoom
   const baseLogoSize = 70; // Base size ~23% of QR
   const logoContainerSize = Math.round(baseLogoSize * logoScale); // Container resizes with logoScale
   const logoCenterX = padding + qrSize / 2;
   const logoCenterY = titleHeight + padding + qrSize / 2;
   const logoInnerSize = logoContainerSize - 4; // Inner drawable area (after border)
-  const logoClipPath = logoShape === 'circle' 
+  const logoClipPath = logoShape === 'circle'
     ? `<clipPath id="logoClip"><circle cx="${logoCenterX}" cy="${logoCenterY}" r="${logoInnerSize / 2}"/></clipPath>`
     : `<clipPath id="logoClip"><rect x="${logoCenterX - logoInnerSize / 2}" y="${logoCenterY - logoInnerSize / 2}" width="${logoInnerSize}" height="${logoInnerSize}" rx="4"/></clipPath>`;
-  
+
   // For crop/zoom: when logoCrop > 1, image should appear larger (zoomed in) so edges get cropped
   // scaledImageSize is the size we draw the image at, clip-path cuts it to logoInnerSize
   const scaledImageSize = Math.round(logoInnerSize * logoCrop);
@@ -278,17 +289,17 @@ function createDecoratedSVG(
   </g>
   
   <!-- QR Code -->
-  <g transform="translate(${padding}, ${titleHeight + padding}) scale(${qrSize / 256})">
+  <svg x="${padding}" y="${titleHeight + padding}" width="${qrSize}" height="${qrSize}" viewBox="${viewBox}">
     ${qrContent}
-  </g>
+  </svg>
   
   ${logoUrl ? `
   <!-- Logo in center -->
   <${logoShape === 'circle' ? 'circle' : 'rect'} 
-    ${logoShape === 'circle' 
-      ? `cx="${logoCenterX}" cy="${logoCenterY}" r="${logoContainerSize / 2}"` 
-      : `x="${logoCenterX - logoContainerSize / 2}" y="${logoCenterY - logoContainerSize / 2}" width="${logoContainerSize}" height="${logoContainerSize}" rx="6"`
-    }
+    ${logoShape === 'circle'
+        ? `cx="${logoCenterX}" cy="${logoCenterY}" r="${logoContainerSize / 2}"`
+        : `x="${logoCenterX - logoContainerSize / 2}" y="${logoCenterY - logoContainerSize / 2}" width="${logoContainerSize}" height="${logoContainerSize}" rx="6"`
+      }
     fill="white" 
     stroke="${gradient?.[0] || accentColor}" 
     stroke-width="2"/>
@@ -318,10 +329,10 @@ function createDecoratedPNG(
   opts: QRDownloadOptions
 ) {
   const { title, description, slug, fgColor = '#1a1a2e', bgColor = '#ffffff', accentColor = '#6366f1', gradient, logoUrl, logoShape = 'circle', logoScale = 1.0, logoCrop = 1.0 } = opts;
-  
+
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d')!;
-  
+
   const hasTitle = !!title;
   const hasDesc = !!description;
   const titleHeight = hasTitle ? 80 : 0;
@@ -330,17 +341,17 @@ function createDecoratedPNG(
   const qrSize = 400;
   const totalWidth = qrSize + padding * 2;
   const totalHeight = qrSize + padding * 2 + titleHeight + descHeight;
-  
+
   canvas.width = totalWidth;
   canvas.height = totalHeight;
-  
+
   const img = new Image();
-  
+
   img.onload = () => {
     // Background
     ctx.fillStyle = bgColor;
     ctx.fillRect(0, 0, totalWidth, totalHeight);
-    
+
     // Title (use first gradient color if gradient)
     if (hasTitle) {
       ctx.fillStyle = gradient && gradient.length > 0 ? gradient[0] : fgColor;
@@ -348,7 +359,7 @@ function createDecoratedPNG(
       ctx.textAlign = 'center';
       ctx.fillText(title!, totalWidth / 2, padding + 35);
     }
-    
+
     // QR Code background (white card with shadow)
     ctx.shadowColor = 'rgba(0, 0, 0, 0.15)';
     ctx.shadowBlur = 20;
@@ -356,12 +367,12 @@ function createDecoratedPNG(
     ctx.fillStyle = 'white';
     roundRect(ctx, padding - 15, titleHeight + padding - 15, qrSize + 30, qrSize + 30, 16);
     ctx.fill();
-    
+
     // Reset shadow
     ctx.shadowColor = 'transparent';
     ctx.shadowBlur = 0;
     ctx.shadowOffsetY = 0;
-    
+
     // Draw QR code - if gradient, apply it using canvas compositing
     if (gradient && gradient.length > 1) {
       // Create temporary canvas for the gradient QR compositing
@@ -369,15 +380,15 @@ function createDecoratedPNG(
       tempCanvas.width = qrSize;
       tempCanvas.height = qrSize;
       const tempCtx = tempCanvas.getContext('2d')!;
-      
+
       // Draw the QR code (black on transparent)
       // Note: SVG should have white bg path and black fg path
       tempCtx.drawImage(img, 0, 0, qrSize, qrSize);
-      
+
       // Get image data to check what we got
       const imageData = tempCtx.getImageData(0, 0, qrSize, qrSize);
       const data = imageData.data;
-      
+
       // Parse gradient colors to RGB
       const gradientColors = gradient.map(hex => {
         const r = parseInt(hex.slice(1, 3), 16);
@@ -385,7 +396,7 @@ function createDecoratedPNG(
         const b = parseInt(hex.slice(5, 7), 16);
         return { r, g, b };
       });
-      
+
       // Apply gradient to dark pixels, keep white pixels white
       for (let y = 0; y < qrSize; y++) {
         for (let x = 0; x < qrSize; x++) {
@@ -393,24 +404,24 @@ function createDecoratedPNG(
           const r = data[i];
           const g = data[i + 1];
           const b = data[i + 2];
-          
+
           // Check if pixel is dark (part of QR code foreground)
           // Using a threshold to detect "dark" pixels
           const luminance = (r * 299 + g * 587 + b * 114) / 1000;
-          
+
           if (luminance < 128) {
             // Calculate gradient position (diagonal)
             const t = (x + y) / (qrSize * 2);
-            
+
             // Interpolate between gradient colors
             const colorIndex = t * (gradientColors.length - 1);
             const colorLow = Math.floor(colorIndex);
             const colorHigh = Math.min(colorLow + 1, gradientColors.length - 1);
             const colorT = colorIndex - colorLow;
-            
+
             const c1 = gradientColors[colorLow];
             const c2 = gradientColors[colorHigh];
-            
+
             data[i] = Math.round(c1.r + (c2.r - c1.r) * colorT);
             data[i + 1] = Math.round(c1.g + (c2.g - c1.g) * colorT);
             data[i + 2] = Math.round(c1.b + (c2.b - c1.b) * colorT);
@@ -424,41 +435,41 @@ function createDecoratedPNG(
           }
         }
       }
-      
+
       tempCtx.putImageData(imageData, 0, 0);
-      
+
       // Draw the gradient QR to main canvas
       ctx.drawImage(tempCanvas, padding, titleHeight + padding, qrSize, qrSize);
-      
+
     } else {
       // Solid color - need to colorize the black QR
       const tempCanvas = document.createElement('canvas');
       tempCanvas.width = qrSize;
       tempCanvas.height = qrSize;
       const tempCtx = tempCanvas.getContext('2d')!;
-      
+
       // Fill with white background first
       tempCtx.fillStyle = 'white';
       tempCtx.fillRect(0, 0, qrSize, qrSize);
-      
+
       // Draw QR code
       tempCtx.drawImage(img, 0, 0, qrSize, qrSize);
-      
+
       // Get image data to manipulate pixels
       const imageData = tempCtx.getImageData(0, 0, qrSize, qrSize);
       const data = imageData.data;
-      
+
       // Parse fgColor to RGB
       const fgR = parseInt(fgColor.slice(1, 3), 16);
       const fgG = parseInt(fgColor.slice(3, 5), 16);
       const fgB = parseInt(fgColor.slice(5, 7), 16);
-      
+
       // Replace black pixels with fgColor
       for (let i = 0; i < data.length; i += 4) {
         const r = data[i];
         const g = data[i + 1];
         const b = data[i + 2];
-        
+
         // Check if pixel is dark (part of QR code)
         if (r < 128 && g < 128 && b < 128) {
           data[i] = fgR;
@@ -466,49 +477,49 @@ function createDecoratedPNG(
           data[i + 2] = fgB;
         }
       }
-      
+
       tempCtx.putImageData(imageData, 0, 0);
       ctx.drawImage(tempCanvas, padding, titleHeight + padding, qrSize, qrSize);
     }
-    
+
     // Helper function to draw logo on canvas with crop/zoom effect
     const drawLogo = (logoImg: HTMLImageElement) => {
       const baseLogoSize = 90; // Base size ~22% of QR
       const logoContainerSize = Math.round(baseLogoSize * logoScale); // Container resizes with logoScale
       const logoCenterX = padding + qrSize / 2;
       const logoCenterY = titleHeight + padding + qrSize / 2;
-      
+
       // Calculate source crop region based on logoCrop
       const imgWidth = logoImg.naturalWidth;
       const imgHeight = logoImg.naturalHeight;
-      
+
       // Crop from center: show 1/logoCrop portion of image
       const cropRatio = 1 / logoCrop;
       const sWidth = Math.round(imgWidth * cropRatio);
       const sHeight = Math.round(imgHeight * cropRatio);
       const sx = Math.round((imgWidth - sWidth) / 2);
       const sy = Math.round((imgHeight - sHeight) / 2);
-      
+
       // White background circle/square with border
       ctx.fillStyle = 'white';
       ctx.strokeStyle = gradient?.[0] || accentColor;
       ctx.lineWidth = 3;
-      
+
       if (logoShape === 'circle') {
         ctx.beginPath();
         ctx.arc(logoCenterX, logoCenterY, logoContainerSize / 2 + 4, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
-        
+
         // Clip to circle and draw logo
         ctx.save();
         ctx.beginPath();
         ctx.arc(logoCenterX, logoCenterY, logoContainerSize / 2, 0, Math.PI * 2);
         ctx.clip();
-        
+
         // Draw with crop/zoom using 9-argument drawImage
         ctx.drawImage(
-          logoImg, 
+          logoImg,
           sx, sy, sWidth, sHeight,  // Source crop region
           logoCenterX - logoContainerSize / 2, logoCenterY - logoContainerSize / 2, logoContainerSize, logoContainerSize  // Destination
         );
@@ -517,15 +528,15 @@ function createDecoratedPNG(
         roundRect(ctx, logoCenterX - logoContainerSize / 2 - 4, logoCenterY - logoContainerSize / 2 - 4, logoContainerSize + 8, logoContainerSize + 8, 8);
         ctx.fill();
         ctx.stroke();
-        
+
         // Clip to rounded rect and draw logo
         ctx.save();
         roundRect(ctx, logoCenterX - logoContainerSize / 2, logoCenterY - logoContainerSize / 2, logoContainerSize, logoContainerSize, 6);
         ctx.clip();
-        
+
         // Draw with crop/zoom using 9-argument drawImage
         ctx.drawImage(
-          logoImg, 
+          logoImg,
           sx, sy, sWidth, sHeight,  // Source crop region
           logoCenterX - logoContainerSize / 2, logoCenterY - logoContainerSize / 2, logoContainerSize, logoContainerSize  // Destination
         );
@@ -542,7 +553,7 @@ function createDecoratedPNG(
         ctx.textAlign = 'center';
         ctx.fillText(description!, totalWidth / 2, titleHeight + qrSize + padding + 45);
       }
-      
+
       triggerDownload(canvas.toDataURL('image/png'), `${slug}_qr.png`);
     };
 
@@ -571,11 +582,11 @@ function createDecoratedPNG(
         ctx.textAlign = 'center';
         ctx.fillText(description!, totalWidth / 2, titleHeight + qrSize + padding + 45);
       }
-      
+
       triggerDownload(canvas.toDataURL('image/png'), `${slug}_qr.png`);
     }
   };
-  
+
   img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(qrSvgData)));
 }
 
