@@ -74,6 +74,14 @@ export function SlotMachine({ participants, winner, isSpinning, onSpinEnd, loadi
     }
   };
 
+  // Reset transform when transitioning from spinning to idle
+  useEffect(() => {
+    if (!isSpinning && !isAnimating && listRef.current) {
+      listRef.current.style.transition = 'none';
+      listRef.current.style.transform = 'translateY(0px)';
+    }
+  }, [isSpinning, isAnimating]);
+
   // Show idle state with participant names (non-animated) when not spinning
   const idleList = participants.length > 0 
     ? [...participants, ...participants, ...participants].slice(0, Math.max(3, participants.length))
