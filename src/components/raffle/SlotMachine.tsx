@@ -79,6 +79,8 @@ export function SlotMachine({ participants, winner, isSpinning, onSpinEnd, loadi
     if (!isSpinning && !isAnimating && listRef.current) {
       listRef.current.style.transition = 'none';
       listRef.current.style.transform = 'translateY(0px)';
+      // Clear display list to ensure fresh idle state
+      setDisplayList([]);
     }
   }, [isSpinning, isAnimating]);
 
@@ -88,7 +90,8 @@ export function SlotMachine({ participants, winner, isSpinning, onSpinEnd, loadi
     : [];
 
   const hasParticipants = participants.length > 0;
-  const showList = isSpinning || isAnimating ? displayList : idleList;
+  const isIdle = !isSpinning && !isAnimating;
+  const showList = isIdle ? idleList : displayList;
 
   if (loading) {
     return (
@@ -115,6 +118,7 @@ export function SlotMachine({ participants, winner, isSpinning, onSpinEnd, loadi
 
       <ul
         ref={listRef}
+        key={isIdle ? 'idle' : 'spinning'}
         onTransitionEnd={handleTransitionEnd}
         className="h-full"
       >
