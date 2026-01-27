@@ -27,7 +27,7 @@ import {
   X
 } from 'lucide-react';
 import { useToast } from '../../hooks/use-toast';
-import { db } from '../../lib/postgrest';
+import { db } from '../../lib/supabase';
 import { isExpired, generateSlug, downloadQRCode, QRDownloadOptions } from '../../lib/qr-utils';
 import { QrRef } from '../../types';
 

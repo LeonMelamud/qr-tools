@@ -14,7 +14,7 @@ import { useParticipants } from '../../context/ParticipantsContext';
 import { useSessionContext } from '../../context/SessionContext';
 import { Confetti } from '../../components/raffle/Confetti';
 import Image from 'next/image';
-import { db } from '../../lib/postgrest';
+import { db } from '../../lib/supabase';
 import placeholderData from '../../lib/placeholder-images.json';
 
 interface AvailableImage {

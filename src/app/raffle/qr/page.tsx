@@ -4,7 +4,7 @@ import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter, useSearchParams } from 'next/navigation';
-import { db } from "../../../lib/postgrest";
+import { db } from "../../../lib/supabase";
 import isEmail from 'validator/lib/isEmail';
 
 import { Button } from "../../../components/ui/button";
