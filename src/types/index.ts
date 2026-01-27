@@ -34,6 +34,8 @@ export interface QrRef {
   is_active?: boolean;
   expires_at?: string;
   scan_count?: number;
+  display_title?: string;   // Custom title shown on QR card (defaults to name)
+  display_message?: string; // Custom message shown on QR card (defaults to description)
   created_at: string;
 }
 

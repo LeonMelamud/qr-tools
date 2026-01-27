@@ -137,6 +137,8 @@ const EMPTY_FORM = {
   category: 'personal',
   is_active: true,
   expires_at: '',
+  display_title: '',
+  display_message: '',
 };
 
 // Convert QrRef to form data
@@ -148,6 +150,8 @@ const qrToForm = (qr: QrRef) => ({
   category: qr.category || 'personal',
   is_active: qr.is_active ?? true,
   expires_at: qr.expires_at?.split('T')[0] || '',
+  display_title: qr.display_title || '',
+  display_message: qr.display_message || '',
 });
 
 export default function QRRefPage() {
@@ -231,6 +235,8 @@ export default function QRRefPage() {
         category: formData.category,
         is_active: formData.is_active,
         expires_at: formData.expires_at || undefined,
+        display_title: formData.display_title || undefined,
+        display_message: formData.display_message || undefined,
       })
       .select('*')
       .single();
@@ -263,6 +269,8 @@ export default function QRRefPage() {
         category: formData.category,
         is_active: formData.is_active,
         expires_at: formData.expires_at || undefined,
+        display_title: formData.display_title || undefined,
+        display_message: formData.display_message || undefined,
       })
       .eq('id', selectedQr.id)
       .select()
@@ -451,6 +459,29 @@ export default function QRRefPage() {
                 <Textarea placeholder="Optional description" value={formData.description} onChange={(e) => updateForm('description', e.target.value)} rows={2} />
               </div>
 
+              {/* Display fields for QR card */}
+              <div className="border-t pt-4 mt-4">
+                <Label className="text-xs text-muted-foreground mb-2 block">QR Card Display (shown below QR image)</Label>
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label>Display Title</Label>
+                    <Input 
+                      placeholder={formData.name || 'Title shown on QR card'}
+                      value={formData.display_title} 
+                      onChange={(e) => updateForm('display_title', e.target.value)} 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Display Message</Label>
+                    <Input 
+                      placeholder="e.g., Scan to connect!"
+                      value={formData.display_message} 
+                      onChange={(e) => updateForm('display_message', e.target.value)} 
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <Label>Category</Label>
                 <Select value={formData.category} onValueChange={(v) => updateForm('category', v)}>
@@ -509,8 +540,8 @@ export default function QRRefPage() {
             </CardHeader>
             <CardContent className="flex flex-col items-center space-y-4">
               {/* Title above QR */}
-              {selectedQr && (
-                <h3 className="text-xl font-semibold text-center">{selectedQr.name || 'Untitled'}</h3>
+              {selectedQr && (formData.display_title || formData.name) && (
+                <h3 className="text-xl font-semibold text-center">{formData.display_title || formData.name}</h3>
               )}
 
               <div className="bg-white p-6 rounded-xl shadow-lg relative overflow-hidden">
@@ -570,9 +601,9 @@ export default function QRRefPage() {
                 )}
               </div>
 
-              {/* Description below QR */}
-              {selectedQr?.description && (
-                <p className="text-sm text-center max-w-[250px]" style={{ color: qrStyle.accent }}>{selectedQr.description}</p>
+              {/* Message below QR */}
+              {formData.display_message && (
+                <p className="text-sm text-center max-w-[250px]" style={{ color: qrStyle.accent }}>{formData.display_message}</p>
               )}
 
               {selectedQr && (
