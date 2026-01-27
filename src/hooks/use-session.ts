@@ -72,13 +72,15 @@ export function useSession(): UseSessionReturn {
       // Try to fetch QR ref for this session (optional - may not exist)
       let qrShortCode: string | null = null;
       try {
-        const { data: qrData } = await db
-          .from<QrRef>('raffle_qr_refs')
+        const { data: qrData, error: qrError } = await db
+          .from('raffle_qr_refs')
           .select('*')
-          .eq('session_id', id)
-          .single();
-        const qr = qrData as unknown as QrRef | null;
-        qrShortCode = qr ? qr.short_code : null;
+          .eq('session_id', id);
+        
+        // Silently handle missing QR refs - this is expected for old sessions
+        if (!qrError && qrData && Array.isArray(qrData) && qrData.length > 0) {
+          qrShortCode = (qrData[0] as QrRef).short_code || null;
+        }
       } catch {
         // raffle_qr_refs table might not exist - that's ok
       }
