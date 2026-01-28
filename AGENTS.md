@@ -225,6 +225,31 @@ This repo has two remotes:
 git push personal main
 ```
 
+## GitHub Actions Deployment
+
+The site is deployed to GitHub Pages via GitHub Actions.
+
+```bash
+# Trigger a rebuild without pushing code changes
+gh workflow run deploy.yml
+
+# Or push an empty commit to trigger rebuild
+git commit --allow-empty -m "Trigger rebuild" && git push personal main
+```
+
+### Environment Secrets (GitHub)
+
+Set these in GitHub repo → Settings → Secrets and variables → Actions:
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `NEXT_PUBLIC_WINNER_WEBHOOK_URL`
+- `NEXT_PUBLIC_SITE_PASSWORD_HASH` - SHA-256 hash of site password
+
+Generate password hash:
+```bash
+node -e "const crypto = require('crypto'); console.log(crypto.createHash('sha256').update('your-password').digest('hex'));"
+```
+
 ## Important Notes
 
 1. **Docker Deployment**: The app runs in Docker with PostgreSQL + PostgREST. Use `docker compose --profile dev up` for development.
