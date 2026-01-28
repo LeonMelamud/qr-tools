@@ -3,6 +3,7 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import type { Participant } from '../../types';
 import { Button } from '../../components/ui/button';
+import { PasswordGate } from '../../components/auth/PasswordGate';
 import { Header } from '../../components/layout/Header';
 import { SlotMachine } from '../../components/raffle/SlotMachine';
 import { SessionIndicator } from '../../components/raffle/SessionIndicator';
@@ -323,7 +324,7 @@ export default function Home() {
   }
 
   return (
-    <>
+    <PasswordGate>
       <Confetti isCelebrating={spinHasEnded || isRainingLogos} image={logoUrl} />
       <SessionIndicator />
       <ParticipantsList />
@@ -442,6 +443,6 @@ export default function Home() {
           <p>Total Participants: {participantCount} | Available this round: {availableCount}</p>
         </footer>
       </main>
-    </>
+    </PasswordGate>
   );
 }

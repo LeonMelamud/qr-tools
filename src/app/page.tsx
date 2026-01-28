@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { QrCode, Ticket } from "lucide-react";
 import { UserProfile } from "../components/auth/user-profile";
+import { PasswordGate } from "../components/auth/PasswordGate";
 
 export default function Home() {
     return (
+        <PasswordGate>
         <div className="min-h-screen flex flex-col items-center justify-center p-8 bg-background text-foreground">
             <main className="max-w-2xl w-full space-y-8">
                 <div className="text-center space-y-2">
@@ -50,5 +52,6 @@ export default function Home() {
                 © {new Date().getFullYear()} QR Tools
             </footer>
         </div>
+        </PasswordGate>
     );
 }

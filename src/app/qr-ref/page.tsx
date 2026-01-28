@@ -29,6 +29,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { useToast } from '../../hooks/use-toast';
+import { PasswordGate } from '../../components/auth/PasswordGate';
 import { db } from '../../lib/supabase';
 import { isExpired, generateSlug, downloadQRCode, QRDownloadOptions } from '../../lib/qr-utils';
 import { QrRef } from '../../types';
@@ -848,6 +849,24 @@ function QRRefContent() {
   );
 }
 
+// Wrapper that applies password gate only for manager (not for redirects)
+function QRRefWithAuth() {
+  const searchParams = useSearchParams();
+  const isRedirect = !!searchParams.get('go');
+
+  // If redirecting, skip password - let the redirect happen
+  if (isRedirect) {
+    return <QRRefContent />;
+  }
+
+  // For manager access, require password
+  return (
+    <PasswordGate>
+      <QRRefContent />
+    </PasswordGate>
+  );
+}
+
 export default function QRRefPage() {
   return (
     <Suspense fallback={
@@ -855,7 +874,7 @@ export default function QRRefPage() {
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     }>
-      <QRRefContent />
+      <QRRefWithAuth />
     </Suspense>
   );
 }
