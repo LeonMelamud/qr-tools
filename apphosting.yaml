@@ -5,3 +5,12 @@ runConfig:
   # Increase this value if you'd like to automatically spin up
   # more instances in response to increased traffic.
   maxInstances: 1
+
+env:
+  # Site-wide password protection
+  # Set actual values via Firebase Console > App Hosting > Settings > Environment variables
+  # Or use Firebase secrets: firebase apphosting:secrets:set SITE_AUTH_USERNAME
+  - variable: SITE_AUTH_USERNAME
+    secret: SITE_AUTH_USERNAME
+  - variable: SITE_AUTH_PASSWORD
+    secret: SITE_AUTH_PASSWORD
