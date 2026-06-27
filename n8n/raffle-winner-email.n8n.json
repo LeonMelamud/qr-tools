@@ -6,7 +6,9 @@
         "httpMethod": "POST",
         "path": "7a8b5663-0f8b-46af-820f-6ce52a0113bc",
         "responseMode": "onReceived",
-        "options": {}
+        "options": {
+          "allowedOrigins": "https://qr.ai-know.org"
+        }
       },
       "id": "b1a2c3d4-0001-4a1b-8c2d-000000000001",
       "name": "Webhook",
