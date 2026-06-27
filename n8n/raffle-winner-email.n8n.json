@@ -1,0 +1,96 @@
+{
+  "name": "Raffle Winner Email",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "7a8b5663-0f8b-46af-820f-6ce52a0113bc",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "b1a2c3d4-0001-4a1b-8c2d-000000000001",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 300],
+      "webhookId": "7a8b5663-0f8b-46af-820f-6ce52a0113bc"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond-email-not-empty",
+              "leftValue": "={{ $json.body.email }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "b1a2c3d4-0002-4a1b-8c2d-000000000002",
+      "name": "Has Email?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.body.email }}",
+        "subject": "=🎉 Congratulations {{ $json.body.name }}, You Won the Raffle!",
+        "emailType": "html",
+        "message": "=<div style='margin:0;padding:0;background-color:#f4f5f7;font-family:Arial,Helvetica,sans-serif;'><table role='presentation' width='100%' cellpadding='0' cellspacing='0' style='background-color:#f4f5f7;padding:24px 0;'><tr><td align='center'><table role='presentation' width='600' cellpadding='0' cellspacing='0' style='max-width:600px;width:100%;background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,0.08);'><tr><td style='background:linear-gradient(135deg,#7c3aed 0%,#db2777 100%);padding:48px 32px;text-align:center;'><div style='font-size:56px;line-height:1;'>🎉</div><h1 style='margin:16px 0 0;color:#ffffff;font-size:28px;font-weight:800;letter-spacing:0.5px;'>You're the Winner!</h1></td></tr><tr><td style='padding:40px 40px 24px;'><p style='margin:0 0 16px;font-size:18px;color:#111827;'>Hi <strong>{{ $json.body.name }} {{ $json.body.last_name }}</strong>,</p><p style='margin:0 0 20px;font-size:16px;line-height:1.6;color:#374151;'>Congratulations! 🥳 Your name was drawn and we're thrilled to let you know that <strong>you've won our raffle</strong>. Out of everyone who entered, luck was on your side today.</p><div style='background:linear-gradient(135deg,#fdf4ff 0%,#faf5ff 100%);border:1px solid #f0abfc;border-radius:12px;padding:20px 24px;text-align:center;margin:24px 0;'><p style='margin:0;font-size:14px;text-transform:uppercase;letter-spacing:1px;color:#a21caf;font-weight:700;'>Official Winner</p><p style='margin:8px 0 0;font-size:22px;font-weight:800;color:#7c3aed;'>{{ $json.body.name }} {{ $json.body.last_name }}</p></div><p style='margin:0 0 8px;font-size:16px;line-height:1.6;color:#374151;'>Our team will be in touch shortly with details on how to claim your prize. Keep an eye on your inbox!</p></td></tr><tr><td style='padding:24px 40px 40px;border-top:1px solid #f3f4f6;'><p style='margin:0 0 4px;font-size:15px;color:#111827;font-weight:600;'>Thank you for participating 💜</p><p style='margin:0;font-size:12px;color:#9ca3af;line-height:1.5;'>This is an automated message — please do not reply directly to this email.</p></td></tr></table></td></tr></table></div>",
+        "options": {}
+      },
+      "id": "b1a2c3d4-0003-4a1b-8c2d-000000000003",
+      "name": "Send Winner Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [760, 220],
+      "webhookId": "",
+      "credentials": {}
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Has Email?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Email?": {
+      "main": [
+        [
+          {
+            "node": "Send Winner Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {}
+}
