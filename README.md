@@ -8,6 +8,7 @@ A hypnotic raffle experience built with **Next.js**, **Tailwind CSS**, and **Sup
 - **Hypnotic Visuals**: Engaging animations and "logo rain" effects.
 - **Fair Selection**: Secure random winner selection.
 - **Supabase Backend**: Robust data storage with Row Level Security.
+- **Winner Email**: Sends a styled congratulations email to the winner via an n8n webhook.
 
 ## Prerequisites
 
@@ -33,6 +34,8 @@ A hypnotic raffle experience built with **Next.js**, **Tailwind CSS**, and **Sup
     ```bash
     NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
     NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+    # Optional: n8n webhook that emails the winner when a draw ends
+    NEXT_PUBLIC_WINNER_WEBHOOK_URL=your_n8n_webhook_url
     ```
     *(Note: For local development, ask the team for the current credentials if you don't have them.)*
 
@@ -71,6 +74,26 @@ This acts as a verification step to ensure all static pages can be generated suc
 4. **Prepare Next Round**: Click "Prepare Next Round" to mark the winner in the database and continue to the next draw.
 5. **Winner Persistence**: Winners are marked as `won: true` in the database and will remain marked even after page refresh.
 6. **Reset Raffle**: When all participants have won, click "Reset Raffle" to start a new round with everyone available again.
+
+## Winner Email Notifications
+
+When a draw ends, the app POSTs the winner's details to the webhook in
+`NEXT_PUBLIC_WINNER_WEBHOOK_URL`:
+
+```json
+{ "name": "John", "last_name": "Doe", "email": "john@example.com" }
+```
+
+An [n8n](https://n8n.io) workflow receives this and emails the winner a styled
+congratulations message. The importable workflow and full setup instructions live in
+[`n8n/`](./n8n/README.md).
+
+> **CORS:** because the request comes from the browser, the n8n Webhook node must allow
+> the site's origin (e.g. `https://qr.ai-know.org`) via **Options → Allowed Origins (CORS)**,
+> otherwise the request is blocked by the browser.
+
+> **Note:** `NEXT_PUBLIC_*` values are embedded in the static client bundle, so the webhook
+> URL is publicly visible. The n8n webhook path acts as the only access control.
 
 ## Deployment
 
