@@ -17,6 +17,26 @@ Move image storage off the local filesystem / component state and onto Supabase 
 - **Object storage**: two public Supabase Storage buckets, `qr-logos` and `raffle-images`. Public read + public write (anon key), matching the existing open RLS posture of `qr_refs`/`participants` — this is a personal/internal tool with no real auth layer (the password gates on `/qr-ref` and `/raffle` are client-side only), so storage policies follow the same pattern rather than introducing new access control.
 - **Metadata**: the DB stores only the resulting public URL (and storage path, for deletion), not raw image bytes. Standard approach for images — avoids Postgres row-size bloat and slow reads that come with storing base64/bytea in table rows.
 
+## Manual Supabase setup (done by you, not by code)
+
+Nothing here can be scripted from the repo — it requires the Supabase dashboard for this project. Do these before/alongside the code changes:
+
+1. **Storage → New bucket** → name `qr-logos` → toggle **Public bucket: ON**. Repeat for a second bucket named `raffle-images`.
+2. **SQL Editor** → run the schema migration for each feature (SQL given in each section below).
+3. **SQL Editor** → run the Storage RLS policies below. The "Public bucket" toggle only lets anyone *read* objects via their public URL — insert/delete still go through Row Level Security on `storage.objects`, so without these, uploads/deletes from the app will fail with a 403.
+
+```sql
+-- qr-logos bucket
+create policy "Public read qr-logos" on storage.objects for select using (bucket_id = 'qr-logos');
+create policy "Public upload qr-logos" on storage.objects for insert with check (bucket_id = 'qr-logos');
+create policy "Public delete qr-logos" on storage.objects for delete using (bucket_id = 'qr-logos');
+
+-- raffle-images bucket
+create policy "Public read raffle-images" on storage.objects for select using (bucket_id = 'raffle-images');
+create policy "Public upload raffle-images" on storage.objects for insert with check (bucket_id = 'raffle-images');
+create policy "Public delete raffle-images" on storage.objects for delete using (bucket_id = 'raffle-images');
+```
+
 ## 1. QR logo persistence
 
 ### Schema change (`docs/qr_logo_migration.sql`, applied manually via Supabase SQL editor, same convention as `docs/qr_refs_schema.sql`)
