@@ -36,7 +36,16 @@ export interface QrRef {
   scan_count?: number;
   display_title?: string;   // Custom title shown on QR card (defaults to name)
   display_message?: string; // Custom message shown on QR card (defaults to description)
+  logo_url?: string;        // Center logo image, stored in the qr-logos Storage bucket
   created_at: string;
+}
+
+export interface RaffleImage {
+  id: string;
+  url: string;
+  storage_path: string;
+  alt?: string;
+  created_at?: string;
 }
 
 // Type for creating a new participant (without auto-generated fields)

@@ -30,7 +30,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '../../hooks/use-toast';
 import { PasswordGate } from '../../components/auth/PasswordGate';
-import { db } from '../../lib/supabase';
+import { db, supabaseAuth } from '../../lib/supabase';
 import { isExpired, generateSlug, downloadQRCode, QRDownloadOptions } from '../../lib/qr-utils';
 import { QrRef } from '../../types';
 
@@ -170,7 +170,7 @@ function QRRefContent() {
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState(EMPTY_FORM);
   const [qrStyle, setQrStyle] = useState<QRStyle>(QR_STYLES[0]);
-  const [logoUrl, setLogoUrl] = useState<string | null>('/images/Bandit.png');
+  const logoUrl = selectedQr?.logo_url || null;
   const [logoShape, setLogoShape] = useState<'square' | 'circle'>('circle');
   const [logoScale, setLogoScale] = useState<number>(1.0); // Border/container size: 0.5 to 1.5
   const [logoCrop, setLogoCrop] = useState<number>(1.0); // Image crop/zoom: 0.5 to 1.5
@@ -380,24 +380,63 @@ function QRRefContent() {
   const getQrPageUrl = () =>
     typeof window !== 'undefined' ? `${window.location.origin}/qr-ref?go=${selectedQr?.slug}` : '';
 
-  // Logo handling
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Logo handling - uploads to the qr-logos Storage bucket and saves the URL on this QR ref
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 500 * 1024) { // 500KB limit
-        toast({ title: "File too large", description: "Please use an image under 500KB.", variant: "destructive" });
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setLogoUrl(event.target?.result as string);
-      };
-      reader.readAsDataURL(file);
+    if (!file || !selectedQr) return;
+
+    if (file.size > 500 * 1024) { // 500KB limit
+      toast({ title: "File too large", description: "Please use an image under 500KB.", variant: "destructive" });
+      return;
     }
+
+    if (!supabaseAuth) {
+      toast({ title: "Error", description: "Storage is not configured.", variant: "destructive" });
+      return;
+    }
+
+    const ext = file.name.split('.').pop();
+    const path = `${selectedQr.id}-${Date.now()}.${ext}`;
+    const { error: uploadError } = await supabaseAuth.storage.from('qr-logos').upload(path, file);
+    if (uploadError) {
+      toast({ title: "Upload failed", description: uploadError.message, variant: "destructive" });
+      return;
+    }
+
+    const { data: { publicUrl } } = supabaseAuth.storage.from('qr-logos').getPublicUrl(path);
+    const { data, error } = await db
+      .from<QrRef>('qr_refs')
+      .update({ logo_url: publicUrl })
+      .eq('id', selectedQr.id)
+      .select()
+      .single();
+
+    if (error) {
+      toast({ title: "Error", description: "Logo uploaded but failed to save to this QR code.", variant: "destructive" });
+      return;
+    }
+
+    setQrRefs(prev => prev.map(q => q.id === (data as QrRef).id ? (data as QrRef) : q));
+    setSelectedQr(data as QrRef);
   };
 
-  const removeLogo = () => {
-    setLogoUrl(null);
+  const removeLogo = async () => {
+    if (!selectedQr) return;
+
+    const { data, error } = await db
+      .from<QrRef>('qr_refs')
+      .update({ logo_url: null })
+      .eq('id', selectedQr.id)
+      .select()
+      .single();
+
+    if (error) {
+      toast({ title: "Error", description: "Failed to remove logo.", variant: "destructive" });
+      return;
+    }
+
+    setQrRefs(prev => prev.map(q => q.id === (data as QrRef).id ? (data as QrRef) : q));
+    setSelectedQr(data as QrRef);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 

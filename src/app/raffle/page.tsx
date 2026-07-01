@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useRef, useEffect } from 'react';
-import type { Participant } from '../../types';
+import type { Participant, RaffleImage } from '../../types';
 import { Button } from '../../components/ui/button';
 import { PasswordGate } from '../../components/auth/PasswordGate';
 import { Header } from '../../components/layout/Header';
@@ -10,7 +10,7 @@ import { SessionIndicator } from '../../components/raffle/SessionIndicator';
 import { ParticipantsList } from '../../components/raffle/ParticipantsList';
 import { secureRandom } from '../../lib/utils';
 import { useToast } from '../../hooks/use-toast';
-import { Trophy, ServerCrash, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
+import { Trophy, ServerCrash, ChevronLeft, ChevronRight, RefreshCw, ImagePlus, Trash2 } from 'lucide-react';
 import { useParticipants } from '../../context/ParticipantsContext';
 import { useSessionContext } from '../../context/SessionContext';
 import { Confetti } from '../../components/raffle/Confetti';
@@ -49,6 +49,7 @@ export default function Home() {
   const [imagesLoading, setImagesLoading] = useState(false);
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const galleryFileInputRef = useRef<HTMLInputElement>(null);
 
   // Reset raffle state when session changes
   useEffect(() => {
@@ -58,51 +59,91 @@ export default function Home() {
     setIsRainingLogos(false);
   }, [sessionId]);
 
-  // Fetch available images from API (with fallback to static list)
+  // Fetch gallery images from Supabase (with fallback to the static placeholder list)
   const fetchImages = async () => {
     setImagesLoading(true);
     try {
-      const response = await fetch('/api/images');
-      if (!response.ok) throw new Error('API not available');
-      const data = await response.json();
-      if (data.images && data.images.length > 0) {
-        setAvailableImages(data.images);
-        setCurrentImageIndex(0);
-        toast({
-          title: "Images Loaded",
-          description: `Found ${data.images.length} images.`,
-        });
+      const { data, error } = await db
+        .from<RaffleImage>('raffle_images')
+        .select('*')
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        setAvailableImages(data.map(img => ({ id: img.id, src: img.url, alt: img.alt || 'Raffle image' })));
       } else {
-        // Fallback to static list
-        const staticImages = placeholderData.images || [];
-        if (staticImages.length > 0) {
-          setAvailableImages(staticImages);
-          toast({
-            title: "Using Static Images",
-            description: `Loaded ${staticImages.length} images from config.`,
-          });
-        } else {
-          toast({
-            title: "No Images",
-            description: "No images found.",
-            variant: "destructive"
-          });
-        }
+        setAvailableImages(placeholderData.images || []);
       }
+      setCurrentImageIndex(0);
     } catch (err) {
-      console.error('Failed to load images from API, using static list:', err);
-      // Fallback to static list when API unavailable (GitHub Pages)
-      const staticImages = placeholderData.images || [];
-      if (staticImages.length > 0) {
-        setAvailableImages(staticImages);
-        toast({
-          title: "Images Loaded",
-          description: `Using ${staticImages.length} pre-configured images.`,
-        });
-      }
+      console.error('Failed to load images from Supabase, using static list:', err);
+      setAvailableImages(placeholderData.images || []);
     } finally {
       setImagesLoading(false);
     }
+  };
+
+  // Load the gallery from Supabase on mount
+  useEffect(() => {
+    fetchImages();
+  }, []);
+
+  // Upload a new image to the gallery (persists to Supabase, no deploy needed)
+  const handleGalleryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const supabaseClient = db.getSupabaseClient();
+    if (!supabaseClient) {
+      toast({ title: "Error", description: "Storage is not configured.", variant: "destructive" });
+      return;
+    }
+
+    const ext = file.name.split('.').pop();
+    const path = `${crypto.randomUUID()}.${ext}`;
+    const { error: uploadError } = await supabaseClient.storage.from('raffle-images').upload(path, file);
+    if (uploadError) {
+      toast({ title: "Upload failed", description: uploadError.message, variant: "destructive" });
+      return;
+    }
+
+    const { data: { publicUrl } } = supabaseClient.storage.from('raffle-images').getPublicUrl(path);
+    const { error: insertError } = await db.from('raffle_images').insert({
+      url: publicUrl,
+      storage_path: path,
+      alt: file.name.replace(/\.[^.]+$/, ''),
+    });
+
+    if (insertError) {
+      toast({ title: "Error", description: "Image uploaded but failed to save to the gallery.", variant: "destructive" });
+      return;
+    }
+
+    toast({ title: "Image added", description: "Uploaded to the raffle gallery." });
+    if (galleryFileInputRef.current) galleryFileInputRef.current.value = '';
+    await fetchImages();
+  };
+
+  // Remove the currently displayed gallery image
+  const handleDeleteCurrentImage = async () => {
+    const current = availableImages[currentImageIndex];
+    if (!current) return;
+
+    const supabaseClient = db.getSupabaseClient();
+    const { data: row } = await db
+      .from<RaffleImage>('raffle_images')
+      .select('*')
+      .eq('id', current.id)
+      .single();
+
+    if (row && supabaseClient) {
+      await supabaseClient.storage.from('raffle-images').remove([row.storage_path]);
+    }
+    await db.from('raffle_images').delete().eq('id', current.id);
+
+    toast({ title: "Image removed" });
+    await fetchImages();
   };
 
   // Computed logo URL - use custom if set, otherwise use current image from array
@@ -377,21 +418,48 @@ export default function Home() {
                 </>
               )}
 
-              <button
-                onClick={fetchImages}
-                disabled={imagesLoading}
-                className="absolute top-2 right-2 p-1.5 rounded-full bg-black/50 hover:bg-black/70 transition-colors disabled:opacity-50 z-30"
-                aria-label="Refresh images"
-                title="Load images from /public/images"
-              >
-                <RefreshCw className={`h-4 w-4 text-white ${imagesLoading ? 'animate-spin' : ''}`} />
-              </button>
+              <div className="absolute top-2 right-2 flex gap-1.5 z-30">
+                <button
+                  onClick={() => galleryFileInputRef.current?.click()}
+                  className="p-1.5 rounded-full bg-black/50 hover:bg-black/70 transition-colors"
+                  aria-label="Add image to gallery"
+                  title="Upload a new gallery image"
+                >
+                  <ImagePlus className="h-4 w-4 text-white" />
+                </button>
+                {availableImages.length > 0 && (
+                  <button
+                    onClick={handleDeleteCurrentImage}
+                    className="p-1.5 rounded-full bg-black/50 hover:bg-black/70 transition-colors"
+                    aria-label="Delete this gallery image"
+                    title="Delete this gallery image"
+                  >
+                    <Trash2 className="h-4 w-4 text-white" />
+                  </button>
+                )}
+                <button
+                  onClick={fetchImages}
+                  disabled={imagesLoading}
+                  className="p-1.5 rounded-full bg-black/50 hover:bg-black/70 transition-colors disabled:opacity-50"
+                  aria-label="Refresh images"
+                  title="Refresh gallery"
+                >
+                  <RefreshCw className={`h-4 w-4 text-white ${imagesLoading ? 'animate-spin' : ''}`} />
+                </button>
+              </div>
             </div>
           </div>
           <input
             type="file"
             ref={fileInputRef}
             onChange={handleFileChange}
+            accept="image/*"
+            className="hidden"
+          />
+          <input
+            type="file"
+            ref={galleryFileInputRef}
+            onChange={handleGalleryUpload}
             accept="image/*"
             className="hidden"
           />
