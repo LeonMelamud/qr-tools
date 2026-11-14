@@ -9,6 +9,11 @@
   ],
   "images": [
     {
+      "id": "ai-leaders-logo",
+      "src": "/images/ai-leaders-logo.png",
+      "alt": "AI Leaders logo"
+    },
+    {
       "id": "ai lead",
       "src": "/images/ai lead.png",
       "alt": "ai lead"
