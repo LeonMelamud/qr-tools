@@ -5,6 +5,7 @@ import type { Participant } from '@/types';
 import { useParticipants as useParticipantsHook } from '@/hooks/use-participants';
 import { useSessionContext } from './SessionContext';
 import { parseIdleMs } from '@/lib/poll-gate';
+import { byDisplayName } from '@/lib/draw-pool';
 
 // Optional override for testing; anything invalid falls back to 10 minutes.
 const POLL_IDLE_MS = parseIdleMs(process.env.NEXT_PUBLIC_POLL_IDLE_MS);
@@ -16,7 +17,8 @@ interface ParticipantsContextType {
   setAvailableParticipants: Dispatch<SetStateAction<Participant[]>>;
   loading: boolean;
   error: Error | null;
-  refetch: () => Promise<Participant[]>;
+  /** The fresh list, or null when it could not be fetched. */
+  refetch: () => Promise<Participant[] | null>;
   /** True while live updates are stopped (idle or hidden tab). */
   isLivePaused: boolean;
   resumeLive: () => void;
@@ -35,7 +37,7 @@ export function ParticipantsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (participants) {
       // Sort participants once when they are loaded/updated
-      const sortedParticipants = [...participants].sort((a, b) => a.display_name.localeCompare(b.display_name));
+      const sortedParticipants = [...participants].sort(byDisplayName);
       
       // Filter available based on won status from DB
       const available = sortedParticipants.filter(p => !p.won);

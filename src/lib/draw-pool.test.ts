@@ -21,4 +21,16 @@ describe('drawPool', () => {
     const result = await drawPool({ refetch: vi.fn().mockResolvedValue([a, b]) });
     expect(result).toEqual([a]);
   });
+
+  // A failed refresh used to fall back to the last list, so a stale list (with a past
+  // winner still eligible) was drawn from. Spec: a winner is never picked from a stale list.
+  it('drawPool returns null when the list could not be refreshed', async () => {
+    expect(await drawPool({ refetch: vi.fn().mockResolvedValue(null) })).toBeNull();
+  });
+
+  it('drawPool sorts the pool by display name, like the list on screen', async () => {
+    const z = p('zed', false);
+    const a = p('amy', false);
+    expect(await drawPool({ refetch: vi.fn().mockResolvedValue([z, a]) })).toEqual([a, z]);
+  });
 });

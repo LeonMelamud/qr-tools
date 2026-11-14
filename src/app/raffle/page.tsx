@@ -52,9 +52,18 @@ export default function Home() {
     placeholderData.images || [{ id: 'linkedin-qr-leon', src: '/images/linkedin-qr-leon.svg', alt: 'LinkedIn QR Code' }]
   );
   const [imagesLoading, setImagesLoading] = useState(false);
+  // True while Start Raffle waits for the fresh list (label and disabled button)
+  const [isDrawing, setIsDrawing] = useState(false);
+  // Locks the draw from the click until the round ends, so a second click can't pick a second winner
+  const drawingRef = useRef(false);
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const galleryFileInputRef = useRef<HTMLInputElement>(null);
+
+  // A started draw keeps the lock until the round ends (next round, reset, or a new session)
+  useEffect(() => {
+    if (!isRaffling) drawingRef.current = false;
+  }, [isRaffling]);
 
   // Reset raffle state when session changes
   useEffect(() => {
@@ -232,21 +241,40 @@ export default function Home() {
   };
 
   const handleStartRaffle = async () => {
-    // Always draw from a fresh list: it may be stale while live updates were paused
-    const pool = await drawPool({ refetch });
-    if (pool.length === 0) {
-      toast({
-        title: "Raffle is empty!",
-        description: "Please add participants or reset the raffle.",
-        variant: "destructive"
-      });
-      return;
+    if (drawingRef.current) return;
+    drawingRef.current = true;
+    setIsDrawing(true);
+    let started = false;
+    try {
+      // Always draw from a freshly fetched list: the one on screen may be stale
+      // (live updates paused, or someone joined since the last poll)
+      const pool = await drawPool({ refetch });
+      if (pool === null) {
+        toast({
+          title: "Could not refresh the list",
+          description: "No winner was drawn. Check the connection and try again.",
+          variant: "destructive"
+        });
+        return;
+      }
+      if (pool.length === 0) {
+        toast({
+          title: "Raffle is empty!",
+          description: "Please add participants or reset the raffle.",
+          variant: "destructive"
+        });
+        return;
+      }
+      // The reel shows exactly the list the winner is drawn from
+      setAvailableParticipants(pool);
+      setSpinHasEnded(false);
+      setIsRaffling(true);
+      setWinner(pool[secureRandom(pool.length)]);
+      started = true;
+    } finally {
+      setIsDrawing(false);
+      if (!started) drawingRef.current = false;
     }
-    setSpinHasEnded(false);
-    setIsRaffling(true);
-    const winnerIndex = secureRandom(pool.length);
-    const pickedWinner = pool[winnerIndex];
-    setWinner(pickedWinner);
   };
 
   const handleSpinEnd = async () => {
@@ -470,13 +498,13 @@ export default function Home() {
             {!isRaffling && !spinHasEnded ? (
               <Button
                 onClick={handleStartRaffle}
-                disabled={isRaffling || loading || availableParticipants.length === 0 || !!error}
+                disabled={isRaffling || isDrawing || loading || availableParticipants.length === 0 || !!error}
                 size="lg"
                 className="font-bold text-lg"
                 variant={error ? "destructive" : "default"}
               >
                 {error ? <ServerCrash className="mr-2 h-5 w-5" /> : <Trophy className="mr-2 h-5 w-5" />}
-                {error ? "Connection Failed" : getLoadingMessage()}
+                {error ? "Connection Failed" : isDrawing ? "Refreshing list…" : getLoadingMessage()}
               </Button>
             ) : spinHasEnded ? (
               <Button onClick={handleNextRound} size="lg" className="font-bold text-lg">

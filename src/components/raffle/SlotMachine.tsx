@@ -27,9 +27,12 @@ export function SlotMachine({ participants, winner, isSpinning, onSpinEnd, loadi
   // Only update display list when spinning STARTS (not during or on every poll)
   useEffect(() => {
     // Detect when spinning starts (transition from false to true)
-    if (isSpinning && !wasSpinningRef.current && winner && participants.length > 0) {
+    if (isSpinning && !wasSpinningRef.current && winner) {
+      // The winner can come from a fresher list than the one on screen (someone who joined
+      // after the last poll); without them on the reel it never stops and onSpinEnd never fires.
+      const reel = participants.some(p => p.id === winner.id) ? participants : [...participants, winner];
       // Shuffle participants for display
-      const shuffled = [...participants].sort(() => 0.5 - Math.random());
+      const shuffled = [...reel].sort(() => 0.5 - Math.random());
       const repeated = Array.from({ length: REPETITIONS }, () => shuffled).flat();
       setDisplayList(repeated);
     }

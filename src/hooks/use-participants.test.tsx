@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act, cleanup } from '@testing-library/react';
 import type { Participant } from '../types';
 
-const state = vi.hoisted(() => ({ data: [] as unknown[], calls: 0 }));
+const state = vi.hoisted(() => ({ data: [] as unknown[], calls: 0, error: null as null | { message: string } }));
 
 vi.mock('@/lib/db', () => ({
   db: {
@@ -11,7 +11,7 @@ vi.mock('@/lib/db', () => ({
         eq: () => ({
           order: () => {
             state.calls++;
-            return Promise.resolve({ data: state.data, error: null });
+            return Promise.resolve(state.error ? { data: null, error: state.error } : { data: state.data, error: null });
           },
         }),
       }),
@@ -31,6 +31,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   state.data = [];
   state.calls = 0;
+  state.error = null;
   visibility = 'visible';
   Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => visibility });
 });
@@ -101,8 +102,22 @@ describe('useParticipants live polling', () => {
   it('refetch returns the fetched list', async () => {
     state.data = [p('a'), p('b')];
     const { result } = renderHook(() => useParticipants({ sessionId: 's1' }));
-    let list: Participant[] = [];
+    let list: Participant[] | null = [];
     await act(async () => { list = await result.current.refetch(); });
-    expect(list.map(x => x.id)).toEqual(['a', 'b']);
+    expect(list!.map(x => x.id)).toEqual(['a', 'b']);
+  });
+
+  // A failed refresh used to resolve with the last list, so the draw could not tell a
+  // stale list from a fresh one (2026-11-14 branch review, finding 3).
+  it('refetch resolves null when the fetch fails, and the screen keeps the last list', async () => {
+    state.data = [p('a')];
+    const { result } = renderHook(() => useParticipants({ sessionId: 's1' }));
+    await advance(0);
+    state.error = { message: 'down' };
+    let fresh: Participant[] | null | 'unset' = 'unset';
+    await act(async () => { fresh = await result.current.refetch(); });
+    expect(fresh).toBeNull();
+    expect(result.current.participants.map(x => x.id)).toEqual(['a']);
+    expect(result.current.error?.message).toBe('down');
   });
 });

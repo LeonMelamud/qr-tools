@@ -20,7 +20,8 @@ interface UseParticipantsReturn {
   isPaused: boolean;
   /** Counts as user activity: restarts polling with an immediate fetch if it was paused. */
   resume: () => void;
-  refetch: () => Promise<Participant[]>;
+  /** Resolves with the fresh list, or null when it could not be fetched (the screen keeps the last list). */
+  refetch: () => Promise<Participant[] | null>;
   addParticipant: (participant: Omit<Participant, 'id' | 'won'>) => Promise<{ data: Participant | null; error: Error | null }>;
   removeParticipant: (id: string) => Promise<{ error: Error | null }>;
   markAsWinner: (id: string) => Promise<{ error: Error | null }>;
@@ -50,8 +51,8 @@ export function useParticipants({
   const lastJson = useRef('[]');
   const lastList = useRef<Participant[]>([]);
 
-  // Fetch participants from database; resolves with the current list (the last known one on error)
-  const fetchParticipants = useCallback(async (): Promise<Participant[]> => {
+  // Fetch participants from database; resolves with the fresh list, or null on error
+  const fetchParticipants = useCallback(async (): Promise<Participant[] | null> => {
     if (!sessionId) {
       setParticipants([]);
       setLoading(false);
@@ -82,7 +83,7 @@ export function useParticipants({
       return newData;
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Failed to fetch participants'));
-      return lastList.current;
+      return null;
     } finally {
       setLoading(false);
     }
