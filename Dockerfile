@@ -26,7 +26,9 @@ ENV NEXT_PUBLIC_POSTGREST_URL=$NEXT_PUBLIC_POSTGREST_URL
 ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
 ENV NEXT_PUBLIC_WINNER_WEBHOOK_URL=$NEXT_PUBLIC_WINNER_WEBHOOK_URL
 
-# Build the application
+# Build the application (DOCKER_BUILD gates output:'standalone' in next.config.ts,
+# which the runner stage's COPY .next/standalone requires)
+ENV DOCKER_BUILD=true
 RUN npm run build
 
 # Stage 3: Runner
