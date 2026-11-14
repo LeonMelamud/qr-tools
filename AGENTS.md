@@ -11,9 +11,9 @@ This document provides guidance for AI agents working on the HypnoRaffle codebas
 - **Framework**: Next.js 15 with App Router (React 19)
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS with shadcn/ui components
-- **Database**: PostgreSQL with PostgREST API (Docker-based)
+- **Database**: Neon serverless Postgres, reached from the browser through the Neon Data API (`@neon/neon-js`, anonymous tokens). Schema: `docs/neon/schema.sql`. (The Docker PostgreSQL + PostgREST setup is legacy/self-hosted only.)
 - **AI Integration**: Google Genkit (optional)
-- **Deployment**: Docker with Cloudflare Tunnel (self-hosted)
+- **Deployment**: GitHub Pages static export at qr.ai-know.org (production); Docker with Cloudflare Tunnel (optional self-hosted)
 
 ## Project Structure
 
@@ -41,8 +41,9 @@ src/
 │   ├── use-session.ts     # Session management
 │   └── use-toast.ts       # Toast notifications
 ├── lib/                   # Utilities and configurations
-│   ├── postgrest.ts       # PostgREST client
-│   ├── supabase.ts        # Database client (wraps PostgREST)
+│   ├── db.ts              # Database client (Neon Data API, anonymous access)
+│   ├── image-data-url.ts  # Image upload -> downscaled data: URL (stored in rows)
+│   ├── poll-gate.ts       # When live polling pauses (idle / hidden tab)
 │   └── utils.ts           # Helper functions (secureRandom, cn, etc.)
 ├── types/                 # TypeScript type definitions
 │   └── index.ts           # Participant, Session interfaces
@@ -107,10 +108,11 @@ useEffect(() => {
 
 ### Database Operations
 
-- Always use the database client from `@/lib/supabase` (wraps PostgREST)
+- Always use the database client from `@/lib/db` (Neon Data API via `@neon/neon-js`)
 - Include `session_id` when inserting participants
-- Row Level Security (RLS) is enabled in PostgreSQL - respect policies
-- API calls go through PostgREST at port 3001
+- Row Level Security (RLS) is enabled; the `anonymous` role has open policies and grants on the app tables (see `docs/neon/schema.sql`)
+- Images (raffle gallery, QR logos) are stored in their rows as `data:` URLs via `fileToDataUrl()`; there is no storage bucket
+- Participant polling pauses after 10 idle minutes or while the tab is hidden (Neon free-plan compute quota); any click/key resumes it
 
 ### Environment Variables
 
@@ -157,7 +159,7 @@ CLOUDFLARE_TUNNEL_TOKEN=<tunnel_token>
 
 ```typescript
 // Fetch participants
-import { db } from '@/lib/supabase';
+import { db } from '@/lib/db';
 
 const { data, error } = await db
   .from('participants')
@@ -187,6 +189,7 @@ const { data } = await db.rpc('create_session_with_qr', {
 
 ## Testing & Validation
 
+- Run `npm test` (Vitest + jsdom) for unit tests
 - Run `npm run typecheck` to verify TypeScript types
 - Run `npm run lint` for linting
 - Run `npm run build` to ensure build works
@@ -240,8 +243,7 @@ git commit --allow-empty -m "Trigger rebuild" && git push personal main
 ### Environment Secrets (GitHub)
 
 Set these in GitHub repo → Settings → Secrets and variables → Actions:
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `NEXT_PUBLIC_NEON_URL` - Neon database base URL
 - `NEXT_PUBLIC_WINNER_WEBHOOK_URL`
 - `NEXT_PUBLIC_SITE_PASSWORD_HASH` - SHA-256 hash of site password
 

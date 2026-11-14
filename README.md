@@ -1,13 +1,14 @@
 # HypnoRaffle
 
-A hypnotic raffle experience built with **Next.js**, **Tailwind CSS**, and **Supabase**.
+A hypnotic raffle experience built with **Next.js**, **Tailwind CSS**, and **Neon** (serverless Postgres).
 
 ## Features
 
 - **Real-time Participation**: Join via QR code and see names appear instantly.
 - **Hypnotic Visuals**: Engaging animations and "logo rain" effects.
 - **Fair Selection**: Secure random winner selection.
-- **Supabase Backend**: Robust data storage with Row Level Security.
+- **Neon Backend**: Postgres via the Neon Data API, with Row Level Security and anonymous access tokens.
+- **Quota-friendly live updates**: The participant list polls every 2 s, pauses after 10 idle minutes or while the tab is hidden, and resumes on any click or key.
 - **Winner Email**: Sends a styled congratulations email to the winner via an n8n webhook.
 
 ## Prerequisites
@@ -29,18 +30,18 @@ A hypnotic raffle experience built with **Next.js**, **Tailwind CSS**, and **Sup
     ```
 
 3.  **Configure Environment Variables:**
-    Create a `.env.local` file in the root directory and add your Supabase credentials:
+    Create a `.env.local` file in the root directory and add the Neon database URL:
 
     ```bash
-    NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-    NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+    # Neon base URL: https://<endpoint>.<cell>.<region>.aws.neon.tech/<database>
+    NEXT_PUBLIC_NEON_URL=your_neon_url
     # Optional: n8n webhook that emails the winner when a draw ends
     NEXT_PUBLIC_WINNER_WEBHOOK_URL=your_n8n_webhook_url
     ```
     *(Note: For local development, ask the team for the current credentials if you don't have them.)*
 
 4.  **Setup Database:**
-    Run the SQL script located in `docs/database_schema.sql` in your Supabase SQL Editor to create the necessary tables and policies.
+    In a Neon project, enable the **Data API** with Neon Auth (anonymous role `anonymous`, CORS for your site and `http://localhost:9002`), then run `docs/neon/schema.sql` in the Neon SQL Editor. It creates the tables, the `create_session_with_qr` function, RLS policies and grants for the `anonymous` role. Images (raffle gallery, QR logos) are stored in their rows as `data:` URLs, so no storage bucket is needed.
 
 ## Running Locally
 
@@ -104,8 +105,7 @@ This project is configured for **GitHub Pages** deployment via GitHub Actions.
     git push personal main
     ```
 2.  **Secrets**: The GitHub Repository Environment `github-pages` must have the following secrets configured under **Settings → Secrets and variables → Actions**:
-    - `NEXT_PUBLIC_SUPABASE_URL` - Your Supabase project URL
-    - `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Your Supabase anonymous key
+    - `NEXT_PUBLIC_NEON_URL` - Your Neon database base URL
     - `NEXT_PUBLIC_WINNER_WEBHOOK_URL` - Webhook URL to receive winner notifications (optional)
 
 The workflow automatically builds the Next.js app as a static export and deploys it to GitHub Pages.

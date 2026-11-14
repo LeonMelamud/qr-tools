@@ -24,6 +24,18 @@ describe('createDatabaseClient', () => {
     }
   });
 
+  it('treats a url the SDK rejects as not configured instead of crashing', async () => {
+    const factory = vi.fn(() => {
+      throw new Error('Invalid Neon base URL: hostname "example.invalid" must have at least 3 dot-separated labels');
+    }) as unknown as ClientFactory;
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const c = createDatabaseClient('https://example.invalid/neondb', factory);
+    expect(c.isConfigured()).toBe(false);
+    expect((await c.rpc('x')).error?.code).toBe('NOT_CONFIGURED');
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+    errorSpy.mockRestore();
+  });
+
   it('creates the Neon client with anonymous access', () => {
     const { factory } = fakeFactory();
     const c = createDatabaseClient(URL, factory);

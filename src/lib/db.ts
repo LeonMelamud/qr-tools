@@ -68,7 +68,13 @@ export class DatabaseClient {
 export function createDatabaseClient(url: string, factory: ClientFactory = defaultFactory): DatabaseClient {
   const trimmed = url.trim();
   if (!trimmed) return new DatabaseClient(null); // calls report 'Database not configured'
-  return new DatabaseClient(factory(trimmed, { auth: { allowAnonymous: true } }));
+  try {
+    return new DatabaseClient(factory(trimmed, { auth: { allowAnonymous: true } }));
+  } catch (err) {
+    // The SDK validates the URL eagerly; a bad value must not crash every page at import time.
+    console.error('[DB] Invalid NEXT_PUBLIC_NEON_URL:', err instanceof Error ? err.message : err);
+    return new DatabaseClient(null);
+  }
 }
 
 export const db = createDatabaseClient(process.env.NEXT_PUBLIC_NEON_URL ?? '');
