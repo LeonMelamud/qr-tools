@@ -52,6 +52,7 @@ export function useSession(): UseSessionReturn {
   const loadSession = useCallback(async (id: string) => {
     setLoading(true);
     setError(null);
+    let notFound = false;
 
     try {
       // Fetch session
@@ -66,6 +67,7 @@ export function useSession(): UseSessionReturn {
       }
 
       if (!sessionData) {
+        notFound = true; // the Data API answers .single() on zero rows with 200 and null
         throw new Error('Session not found');
       }
 
@@ -92,7 +94,9 @@ export function useSession(): UseSessionReturn {
       localStorage.setItem(SESSION_STORAGE_KEY, id);
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Failed to load session'));
-      localStorage.removeItem(SESSION_STORAGE_KEY);
+      // Forget the stored id only when the session is gone: after a passing failure
+      // (network, Neon Auth token, cold compute) the next refresh must find it again
+      if (notFound) localStorage.removeItem(SESSION_STORAGE_KEY);
       setSessionId(null);
       setSession(null);
       setShortCode(null);

@@ -116,22 +116,27 @@ useEffect(() => {
 
 ### Environment Variables
 
-Required environment variables:
+Required environment variables (see `.env.example`):
 ```
-# Database
+# Database: Neon base URL (the Data API and Neon Auth URLs are derived from it)
+NEXT_PUBLIC_NEON_URL=https://ep-xxx.c-N.<region>.aws.neon.tech/neondb
+
+# Optional
+NEXT_PUBLIC_WINNER_WEBHOOK_URL=<optional_webhook_url>
+NEXT_PUBLIC_SITE_PASSWORD_HASH=<sha256_of_site_password>
+NEXT_PUBLIC_POLL_IDLE_MS=600000   # local testing only: pause live updates sooner
+```
+
+The deploy workflow fails before building when `NEXT_PUBLIC_NEON_URL` is missing or malformed (`scripts/check-neon-url.mjs`).
+
+Legacy self-hosted Docker (PostgreSQL + PostgREST) only:
+```
 POSTGRES_USER=hypnoraffle
 POSTGRES_PASSWORD=<secure_password>
 POSTGRES_DB=hypnoraffle
-
-# API
 NEXT_PUBLIC_POSTGREST_URL=http://localhost:3001
 JWT_SECRET=<min_32_char_secret>
-
-# App
 NEXT_PUBLIC_APP_URL=http://localhost:9002
-NEXT_PUBLIC_WINNER_WEBHOOK_URL=<optional_webhook_url>
-
-# Optional: Cloudflare Tunnel
 CLOUDFLARE_TUNNEL_TOKEN=<tunnel_token>
 ```
 
