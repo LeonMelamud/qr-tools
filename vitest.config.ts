@@ -8,6 +8,8 @@ export default defineConfig({
       '@': path.resolve(__dirname, 'src'),
     },
   },
+  // tsconfig has "jsx": "preserve" for Next; tests need the automatic runtime (no `import React`).
+  esbuild: { jsx: 'automatic' },
   test: {
     environment: 'jsdom',
     setupFiles: ['./vitest.setup.ts'],

@@ -14,6 +14,8 @@ import { Trophy, ServerCrash, ChevronLeft, ChevronRight, RefreshCw, ImagePlus, T
 import { useParticipants } from '../../context/ParticipantsContext';
 import { useSessionContext } from '../../context/SessionContext';
 import { Confetti } from '../../components/raffle/Confetti';
+import { LivePausedBadge } from '../../components/raffle/LivePausedBadge';
+import { drawPool } from '../../lib/draw-pool';
 import Image from 'next/image';
 import { db } from '../../lib/supabase';
 import placeholderData from '../../lib/placeholder-images.json';
@@ -32,7 +34,9 @@ export default function Home() {
     setAvailableParticipants,
     loading,
     error,
-    refetch
+    refetch,
+    isLivePaused,
+    resumeLive
   } = useParticipants();
 
   const { sessionId } = useSessionContext();
@@ -240,8 +244,10 @@ export default function Home() {
     }
   };
 
-  const handleStartRaffle = () => {
-    if (availableParticipants.length === 0) {
+  const handleStartRaffle = async () => {
+    // Always draw from a fresh list: it may be stale while live updates were paused
+    const pool = await drawPool({ refetch });
+    if (pool.length === 0) {
       toast({
         title: "Raffle is empty!",
         description: "Please add participants or reset the raffle.",
@@ -251,8 +257,8 @@ export default function Home() {
     }
     setSpinHasEnded(false);
     setIsRaffling(true);
-    const winnerIndex = secureRandom(availableParticipants.length);
-    const pickedWinner = availableParticipants[winnerIndex];
+    const winnerIndex = secureRandom(pool.length);
+    const pickedWinner = pool[winnerIndex];
     setWinner(pickedWinner);
   };
 
@@ -367,6 +373,7 @@ export default function Home() {
   return (
     <PasswordGate>
       <Confetti isCelebrating={spinHasEnded || isRainingLogos} image={logoUrl} />
+      <LivePausedBadge paused={isLivePaused} onResume={resumeLive} />
       <SessionIndicator />
       <ParticipantsList />
       <main className="flex flex-col items-center justify-start min-h-screen w-full p-4 md:p-8 pt-20 md:pt-24 relative">

@@ -1,39 +1,61 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { db } from '../lib/supabase';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { db } from '@/lib/db';
+import { DEFAULT_POLL_IDLE_MS, isPollingPaused } from '@/lib/poll-gate';
 import type { Participant } from '../types';
 
 interface UseParticipantsOptions {
   sessionId: string | null;
   pollingInterval?: number; // in milliseconds, default 2000
+  idleMs?: number; // stop polling after this long with no input and no change, default 10 min
+  now?: () => number;
 }
 
 interface UseParticipantsReturn {
   participants: Participant[];
   loading: boolean;
   error: Error | null;
-  refetch: () => Promise<void>;
+  /** True while live polling is stopped (idle or hidden tab). */
+  isPaused: boolean;
+  /** Counts as user activity: restarts polling with an immediate fetch if it was paused. */
+  resume: () => void;
+  refetch: () => Promise<Participant[]>;
   addParticipant: (participant: Omit<Participant, 'id' | 'won'>) => Promise<{ data: Participant | null; error: Error | null }>;
   removeParticipant: (id: string) => Promise<{ error: Error | null }>;
   markAsWinner: (id: string) => Promise<{ error: Error | null }>;
   clearWinners: () => Promise<{ error: Error | null }>;
 }
 
-export function useParticipants({ 
-  sessionId, 
-  pollingInterval = 2000 
+const ACTIVITY_EVENTS = ['pointerdown', 'keydown', 'touchstart'] as const;
+
+const isTabHidden = () => typeof document !== 'undefined' && document.visibilityState === 'hidden';
+
+export function useParticipants({
+  sessionId,
+  pollingInterval = 2000,
+  idleMs = DEFAULT_POLL_IDLE_MS,
+  now = Date.now,
 }: UseParticipantsOptions): UseParticipantsReturn {
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const [isPaused, setIsPaused] = useState(false);
 
-  // Fetch participants from database
-  const fetchParticipants = useCallback(async () => {
+  const nowRef = useRef(now);
+  nowRef.current = now;
+  const lastActivityAt = useRef(now());
+  const lastChangeAt = useRef(now());
+  const pausedRef = useRef(false);
+  const lastJson = useRef('[]');
+  const lastList = useRef<Participant[]>([]);
+
+  // Fetch participants from database; resolves with the current list (the last known one on error)
+  const fetchParticipants = useCallback(async (): Promise<Participant[]> => {
     if (!sessionId) {
       setParticipants([]);
       setLoading(false);
-      return;
+      return [];
     }
 
     try {
@@ -47,17 +69,20 @@ export function useParticipants({
         throw new Error(fetchError.message);
       }
 
-      // Only update state if data actually changed (compare by stringified value)
-      setParticipants(prev => {
-        const newData = data || [];
-        if (JSON.stringify(prev) === JSON.stringify(newData)) {
-          return prev; // Return same reference to prevent re-render
-        }
-        return newData;
-      });
+      const newData = (data || []) as Participant[];
+      const json = JSON.stringify(newData);
+      // Only update state (and the idle clock) when the data actually changed
+      if (json !== lastJson.current) {
+        lastJson.current = json;
+        lastList.current = newData;
+        lastChangeAt.current = nowRef.current();
+        setParticipants(newData);
+      }
       setError(null);
+      return newData;
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Failed to fetch participants'));
+      return lastList.current;
     } finally {
       setLoading(false);
     }
@@ -67,19 +92,58 @@ export function useParticipants({
   useEffect(() => {
     setParticipants([]);
     setLoading(true);
+    lastJson.current = '[]';
+    lastList.current = [];
   }, [sessionId]);
 
-  // Initial fetch and polling
+  // Initial fetch and polling; ticks are skipped while idle or hidden
   useEffect(() => {
     fetchParticipants();
 
-    // Set up polling for real-time-like updates
-    const interval = setInterval(fetchParticipants, pollingInterval);
+    const interval = setInterval(() => {
+      const paused = isPollingPaused({
+        now: nowRef.current(),
+        lastActivityAt: lastActivityAt.current,
+        lastChangeAt: lastChangeAt.current,
+        hidden: isTabHidden(),
+        idleMs,
+      });
+      if (paused) {
+        if (!pausedRef.current) {
+          pausedRef.current = true;
+          setIsPaused(true);
+        }
+        return;
+      }
+      fetchParticipants();
+    }, pollingInterval);
 
     return () => {
       clearInterval(interval);
     };
-  }, [fetchParticipants, pollingInterval]);
+  }, [fetchParticipants, pollingInterval, idleMs]);
+
+  const resume = useCallback(() => {
+    lastActivityAt.current = nowRef.current();
+    if (pausedRef.current && !isTabHidden()) {
+      pausedRef.current = false;
+      setIsPaused(false);
+      fetchParticipants();
+    }
+  }, [fetchParticipants]);
+
+  // Any input, or the tab becoming visible again, counts as activity
+  useEffect(() => {
+    const onVisibility = () => {
+      if (!isTabHidden()) resume();
+    };
+    ACTIVITY_EVENTS.forEach(evt => window.addEventListener(evt, resume));
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      ACTIVITY_EVENTS.forEach(evt => window.removeEventListener(evt, resume));
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [resume]);
 
   // Add a new participant
   const addParticipant = useCallback(async (
@@ -192,6 +256,8 @@ export function useParticipants({
     participants,
     loading,
     error,
+    isPaused,
+    resume,
     refetch: fetchParticipants,
     addParticipant,
     removeParticipant,

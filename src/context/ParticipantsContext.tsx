@@ -4,6 +4,10 @@ import React, { createContext, useContext, useState, ReactNode, Dispatch, SetSta
 import type { Participant } from '@/types';
 import { useParticipants as useParticipantsHook } from '@/hooks/use-participants';
 import { useSessionContext } from './SessionContext';
+import { parseIdleMs } from '@/lib/poll-gate';
+
+// Optional override for testing; anything invalid falls back to 10 minutes.
+const POLL_IDLE_MS = parseIdleMs(process.env.NEXT_PUBLIC_POLL_IDLE_MS);
 
 interface ParticipantsContextType {
   allParticipants: Participant[];
@@ -12,14 +16,17 @@ interface ParticipantsContextType {
   setAvailableParticipants: Dispatch<SetStateAction<Participant[]>>;
   loading: boolean;
   error: Error | null;
-  refetch: () => Promise<void>;
+  refetch: () => Promise<Participant[]>;
+  /** True while live updates are stopped (idle or hidden tab). */
+  isLivePaused: boolean;
+  resumeLive: () => void;
 }
 
 const ParticipantsContext = createContext<ParticipantsContextType | undefined>(undefined);
 
 export function ParticipantsProvider({ children }: { children: ReactNode }) {
   const { sessionId, loading: sessionLoading } = useSessionContext();
-  const { participants, loading: participantsLoading, error, refetch } = useParticipantsHook({ sessionId });
+  const { participants, loading: participantsLoading, error, refetch, isPaused, resume } = useParticipantsHook({ sessionId, idleMs: POLL_IDLE_MS });
   const [allParticipants, setAllParticipants] = useState<Participant[]>([]);
   const [availableParticipants, setAvailableParticipants] = useState<Participant[]>([]);
 
@@ -63,6 +70,8 @@ export function ParticipantsProvider({ children }: { children: ReactNode }) {
     loading,
     error,
     refetch,
+    isLivePaused: isPaused,
+    resumeLive: resume,
   };
 
   return (

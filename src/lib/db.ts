@@ -67,10 +67,7 @@ export class DatabaseClient {
 
 export function createDatabaseClient(url: string, factory: ClientFactory = defaultFactory): DatabaseClient {
   const trimmed = url.trim();
-  if (!trimmed) {
-    if (typeof window !== 'undefined') console.warn('[DB] NEXT_PUBLIC_NEON_URL is not set');
-    return new DatabaseClient(null);
-  }
+  if (!trimmed) return new DatabaseClient(null); // calls report 'Database not configured'
   return new DatabaseClient(factory(trimmed, { auth: { allowAnonymous: true } }));
 }
 

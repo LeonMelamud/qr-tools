@@ -7,10 +7,11 @@ import { Header } from "../../../components/layout/Header";
 import { useParticipants } from "../../../context/ParticipantsContext";
 import { useRouter } from 'next/navigation';
 import { Button } from '../../../components/ui/button';
+import { LivePausedBadge } from '../../../components/raffle/LivePausedBadge';
 
 export default function QRDisplayPage() {
     const [url, setUrl] = useState('');
-    const { setAllParticipants, setAvailableParticipants, allParticipants } = useParticipants();
+    const { setAllParticipants, setAvailableParticipants, allParticipants, isLivePaused, resumeLive } = useParticipants();
     const router = useRouter();
 
 
@@ -33,6 +34,7 @@ export default function QRDisplayPage() {
 
     return (
         <main className="flex flex-col items-center min-h-screen w-full p-4 md:p-8 relative">
+            <LivePausedBadge paused={isLivePaused} onResume={resumeLive} />
             <Header onParticipantsLoad={handleParticipantsLoad} isRaffling={false}>
                 <Button onClick={() => router.push('/')} variant="outline" className="font-bold">
                     Back to Raffle
