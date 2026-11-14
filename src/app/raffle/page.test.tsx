@@ -135,7 +135,7 @@ describe('raffle draw', () => {
     expect(reel().textContent).toContain('c');
     expect(reel().style.transform).toMatch(/^translateY\(-\d+px\)$/);
     fireEvent.transitionEnd(reel());
-    expect(await screen.findByRole('button', { name: /prepare next round/i })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: /start raffle/i })).toBeTruthy();
   });
 
   it('the reel shows exactly the pool the winner was drawn from', async () => {
@@ -176,7 +176,7 @@ describe('raffle draw', () => {
     expect(h.toast).toHaveBeenCalledWith(
       expect.objectContaining({ variant: 'destructive', title: 'Could not refresh the list' })
     );
-    expect(screen.queryByRole('button', { name: /prepare next round/i })).toBeNull();
+    expect(reel().style.transform).not.toMatch(/translateY\(-/);
   });
 
   it('after a failed refresh, the next click can still draw', async () => {
@@ -199,12 +199,11 @@ describe('raffle draw', () => {
 // Leon, 2026-11-14: the winner was saved only on "Prepare Next Round", so closing or
 // reloading the page after a spin left them in the draw and they could win again.
 describe('saving the winner', () => {
-  it('saves the winner as soon as the reel reveals them, before Prepare Next Round', async () => {
+  it('saves the winner as soon as the reel reveals them', async () => {
     const start = await renderRaffle([p('a'), p('b')]);
 
     await drawAndReveal(start, 1);
 
-    expect(await screen.findByRole('button', { name: /prepare next round/i })).toBeTruthy();
     expect(wonWrites('b')).toHaveLength(1);
   });
 
@@ -218,30 +217,32 @@ describe('saving the winner', () => {
     expect(wonWrites('a')).toHaveLength(1);
   });
 
-  it('does not start the next round while the winner cannot be saved', async () => {
+  it('does not draw the next winner while the last one cannot be saved', async () => {
     const start = await renderRaffle([p('a'), p('b')]);
     h.failUpdate = true;
     await drawAndReveal(start, 0);
 
-    await press(await screen.findByRole('button', { name: /prepare next round/i }));
+    await press(await screen.findByRole('button', { name: /start raffle/i }));
 
     expect(h.toast).toHaveBeenCalledWith(
       expect.objectContaining({ variant: 'destructive', title: 'Could not save the winner' })
     );
-    expect(screen.getByRole('button', { name: /prepare next round/i })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: /start raffle/i })).toBeNull();
+    expect(h.secureRandom).toHaveBeenCalledTimes(1);
+    expect(reel().style.transform).toMatch(/^translateY\(-\d+px\)$/); // still on the last winner
   });
 
-  it('a save that failed at the reveal is retried by Prepare Next Round', async () => {
+  it('a save that failed at the reveal is retried before the next draw', async () => {
     const start = await renderRaffle([p('a'), p('b')]);
     h.failUpdate = true;
     await drawAndReveal(start, 0);
     h.failUpdate = false;
+    h.rows = [p('a', true), p('b')];
 
-    await press(await screen.findByRole('button', { name: /prepare next round/i }));
+    h.secureRandom.mockReturnValue(0);
+    await press(await screen.findByRole('button', { name: /start raffle/i }));
 
     expect(wonWrites('a').length).toBeGreaterThanOrEqual(2);
-    expect(await screen.findByRole('button', { name: /start raffle/i })).toBeTruthy();
+    expect(h.secureRandom).toHaveBeenCalledTimes(2);
   });
 
   // Saved at the reveal, the next poll (2 s) drops the winner from the available list while
@@ -255,6 +256,50 @@ describe('saving the winner', () => {
 
     expect(reel().textContent).toContain('amy');
     expect(reel().textContent).not.toMatch(/add participants/i);
-    expect(screen.getByRole('button', { name: /prepare next round/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /start new round/i })).toBeTruthy();
   }, 10_000);
+});
+
+// Leon, 2026-11-14: one button. Start Raffle on the winner screen draws the next winner;
+// there is no "Prepare Next Round" step.
+describe('next draw from the winner screen', () => {
+  it('Start Raffle on the winner screen draws the next winner in one click', async () => {
+    const start = await renderRaffle([p('a'), p('b')]);
+    await drawAndReveal(start, 0);
+    expect(screen.queryByRole('button', { name: /prepare next round/i })).toBeNull();
+    h.rows = [p('a', true), p('b'), p('c')]; // a is saved, c joined during the reveal
+
+    h.secureRandom.mockReturnValue(1); // pool [b, c]
+    await press(await screen.findByRole('button', { name: /start raffle/i }));
+
+    expect(h.secureRandom).toHaveBeenCalledTimes(2);
+    expect(reelNames()).toEqual(['b', 'c']);
+    expect(reel().style.transform).toMatch(/^translateY\(-\d+px\)$/);
+    fireEvent.transitionEnd(reel());
+    expect(await screen.findByRole('button', { name: /start raffle/i })).toBeTruthy();
+    expect(wonWrites('c')).toHaveLength(1);
+  });
+
+  it('a double click on the winner screen draws one next winner', async () => {
+    const start = await renderRaffle([p('a'), p('b'), p('c')]);
+    await drawAndReveal(start, 0);
+    h.rows = [p('a', true), p('b'), p('c')];
+
+    await press(await screen.findByRole('button', { name: /start raffle/i }), 2);
+
+    expect(h.secureRandom).toHaveBeenCalledTimes(2);
+  });
+
+  it('when the last participant has won, Start New Round puts everyone back without drawing', async () => {
+    const start = await renderRaffle([p('amy')]);
+    await drawAndReveal(start, 0);
+    expect(screen.queryByRole('button', { name: /start raffle/i })).toBeNull();
+
+    await press(await screen.findByRole('button', { name: /start new round/i }));
+
+    const reset = h.updates.findIndex(u => JSON.stringify(u.values) === '{"won":false}' && u.eq.some(([c, v]) => c === 'session_id' && v === 's1'));
+    expect(reset).toBeGreaterThan(h.updates.indexOf(wonWrites('amy')[0]));
+    expect(h.secureRandom).toHaveBeenCalledTimes(1);
+    expect(await screen.findByRole('button', { name: /start raffle/i })).toBeTruthy();
+  });
 });

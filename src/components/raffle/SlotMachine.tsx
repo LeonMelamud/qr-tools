@@ -23,11 +23,14 @@ export function SlotMachine({ participants, winner, isSpinning, onSpinEnd, loadi
   const [isAnimating, setIsAnimating] = useState(false);
   const listRef = useRef<HTMLUListElement>(null);
   const wasSpinningRef = useRef(false);
+  const reelWinnerRef = useRef<Participant | null>(null);
 
-  // Only update display list when spinning STARTS (not during or on every poll)
+  // Only update display list when a spin STARTS (not during or on every poll)
   useEffect(() => {
-    // Detect when spinning starts (transition from false to true)
-    if (isSpinning && !wasSpinningRef.current && winner) {
+    // A spin starts when spinning turns on, or when a new winner is drawn straight from the
+    // last winner's screen (spinning stays on in between)
+    if (isSpinning && winner && (!wasSpinningRef.current || winner !== reelWinnerRef.current)) {
+      reelWinnerRef.current = winner;
       // The winner can come from a fresher list than the one on screen (someone who joined
       // after the last poll); without them on the reel it never stops and onSpinEnd never fires.
       const reel = participants.some(p => p.id === winner.id) ? participants : [...participants, winner];

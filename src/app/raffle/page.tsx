@@ -54,7 +54,7 @@ export default function Home() {
   const [imagesLoading, setImagesLoading] = useState(false);
   // True while Start Raffle waits for the fresh list (label and disabled button)
   const [isDrawing, setIsDrawing] = useState(false);
-  // Locks the draw from the click until the round ends, so a second click can't pick a second winner
+  // Locks the draw from the click until the reel stops, so a second click can't pick a second winner
   const drawingRef = useRef(false);
   // The save of the revealed winner (true once it is in the database)
   const winnerSaveRef = useRef<Promise<boolean> | null>(null);
@@ -62,7 +62,7 @@ export default function Home() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const galleryFileInputRef = useRef<HTMLInputElement>(null);
 
-  // A started draw keeps the lock until the round ends (next round, reset, or a new session)
+  // A started draw keeps the lock until the reel stops (or a reset or new session ends the round)
   useEffect(() => {
     if (!isRaffling) drawingRef.current = false;
   }, [isRaffling]);
@@ -248,6 +248,19 @@ export default function Home() {
     setIsDrawing(true);
     let started = false;
     try {
+      // The winner still on screen must be saved first, or they could be drawn again
+      if (spinHasEnded && winner) {
+        const saved = (await winnerSaveRef.current) || (await markWon(winner.id));
+        if (!saved) {
+          toast({
+            title: 'Could not save the winner',
+            description: 'No new winner was drawn, because they could be drawn again. Check the connection and try again.',
+            variant: 'destructive'
+          });
+          return;
+        }
+        winnerSaveRef.current = Promise.resolve(true);
+      }
       // Always draw from a freshly fetched list: the one on screen may be stale
       // (live updates paused, or someone joined since the last poll)
       const pool = await drawPool({ refetch });
@@ -298,6 +311,8 @@ export default function Home() {
 
   const handleSpinEnd = async () => {
     setSpinHasEnded(true);
+    // The reel has stopped: Start Raffle can draw the next winner
+    drawingRef.current = false;
 
     if (winner) {
       // Saved the moment the name is revealed, so closing or reloading the page
@@ -329,46 +344,11 @@ export default function Home() {
     }
   };
 
-  const handleNextRound = async () => {
-    if (winner) {
-      // Wait for the save started at the reveal; if it failed, try once more.
-      // A winner who isn't saved could be drawn again, so the round doesn't move on.
-      const saved = (await winnerSaveRef.current) || (await markWon(winner.id));
-      if (!saved) {
-        toast({
-          title: 'Could not save the winner',
-          description: 'They could be drawn again. Check the connection and press Prepare Next Round again.',
-          variant: 'destructive'
-        });
-        return;
-      }
-      winnerSaveRef.current = null;
-    }
-    setSpinHasEnded(false);
-    setIsRaffling(false);
-    if (winner) {
-      const remaining = availableParticipants.filter(p => p.id !== winner.id);
-      setAvailableParticipants(remaining);
-
-      // If that was the last participant, reset available to all for the next major round
-      if (remaining.length === 0 && allParticipants.length > 0) {
-        toast({
-          title: 'Round Complete!',
-          description: 'All participants have been chosen. Resetting for a new round.',
-        });
-        // Reset all winners in DB
-        try {
-          await db
-            .from('participants')
-            .update({ won: false })
-            .eq('session_id', sessionId!);
-        } catch (err) {
-          console.error('Failed to reset winners in DB:', err);
-        }
-        setAvailableParticipants(allParticipants);
-      }
-    }
-    setWinner(null);
+  // On the last winner's screen: everyone goes back into the draw
+  const handleNewRound = async () => {
+    // The reveal's save must land before the reset, or the winner stays out of the new round
+    await winnerSaveRef.current;
+    await handleResetRaffle();
   };
 
   const handleLogoRain = () => {
@@ -401,6 +381,8 @@ export default function Home() {
   }
 
   const participantCount = useMemo(() => allParticipants.length, [allParticipants]);
+  // On the winner screen, nobody else is left to draw (the poll may already have dropped the winner)
+  const nobodyLeft = spinHasEnded && !!winner && availableParticipants.every(p => p.id === winner.id);
   const availableCount = useMemo(() => availableParticipants.length, [availableParticipants]);
 
   const getLoadingMessage = () => {
@@ -518,20 +500,20 @@ export default function Home() {
             error={error}
           />
           <div className="flex flex-wrap gap-4 items-center justify-center">
-            {!isRaffling && !spinHasEnded ? (
+            {nobodyLeft ? (
+              <Button onClick={handleNewRound} size="lg" className="font-bold text-lg">
+                Start New Round
+              </Button>
+            ) : !isRaffling || spinHasEnded ? (
               <Button
                 onClick={handleStartRaffle}
-                disabled={isRaffling || isDrawing || loading || availableParticipants.length === 0 || !!error}
+                disabled={isDrawing || loading || availableParticipants.length === 0 || !!error}
                 size="lg"
                 className="font-bold text-lg"
                 variant={error ? "destructive" : "default"}
               >
                 {error ? <ServerCrash className="mr-2 h-5 w-5" /> : <Trophy className="mr-2 h-5 w-5" />}
                 {error ? "Connection Failed" : isDrawing ? "Refreshing list…" : getLoadingMessage()}
-              </Button>
-            ) : spinHasEnded ? (
-              <Button onClick={handleNextRound} size="lg" className="font-bold text-lg">
-                Prepare Next Round
               </Button>
             ) : null}
 

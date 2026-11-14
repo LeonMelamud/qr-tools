@@ -25,4 +25,23 @@ describe('SlotMachine', () => {
     fireEvent.transitionEnd(reel);
     expect(onSpinEnd).toHaveBeenCalledTimes(1);
   });
+
+  // The next draw starts straight from the winner screen, so isSpinning never goes false
+  // in between: a new winner must rebuild the reel, or a late joiner is never on it.
+  it('spins again when a new winner is drawn while the last one is still on screen', () => {
+    const [a, b, c] = [p('a'), p('b'), p('c')];
+    const onSpinEnd = vi.fn();
+    const base = { onSpinEnd, loading: false, error: null };
+    const { container, rerender } = render(<SlotMachine {...base} participants={[a, b]} winner={null} isSpinning={false} />);
+    rerender(<SlotMachine {...base} participants={[a, b]} winner={a} isSpinning />);
+    const reel = container.querySelector('ul')!;
+    fireEvent.transitionEnd(reel);
+
+    rerender(<SlotMachine {...base} participants={[b, c]} winner={c} isSpinning />);
+
+    expect(reel.textContent).toContain('c');
+    expect(reel.textContent).not.toContain('a');
+    fireEvent.transitionEnd(reel);
+    expect(onSpinEnd).toHaveBeenCalledTimes(2);
+  });
 });
