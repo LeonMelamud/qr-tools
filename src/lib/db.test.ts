@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { createDatabaseClient, type ClientFactory } from './db';
 
 const URL = 'https://ep-x.c-8.eu-central-1.aws.neon.tech/neondb';
@@ -8,6 +8,42 @@ function fakeFactory() {
   const factory = vi.fn(() => fake) as unknown as ClientFactory & ReturnType<typeof vi.fn>;
   return { fake, factory };
 }
+
+describe('default Neon client (real SDK, stubbed network)', () => {
+  const BASE = 'https://ep-x.c-8.eu-central-1.aws.neon.tech/neondb';
+  const realFetch = globalThis.fetch;
+
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+  });
+
+  // Found in the 2026-11-14 browser run: with createClient(url, { auth: { allowAnonymous: true } })
+  // every query also called GET /auth/get-session, doubling requests on every 2 s poll.
+  it('uses one cached anonymous token and never calls get-session', async () => {
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    const jwt = `h.${btoa(JSON.stringify({ role: 'anonymous', exp }))}.s`;
+    const calls: { url: string; auth: string | null }[] = [];
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof globalThis.URL ? input.href : input.url;
+      const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
+      calls.push({ url, auth: headers.get('authorization') });
+      if (url.includes('/token/anonymous')) {
+        return new Response(JSON.stringify({ token: jwt, expires_at: exp }), { status: 200, headers: { 'content-type': 'application/json' } });
+      }
+      return new Response('[]', { status: 200, headers: { 'content-type': 'application/json' } });
+    }) as typeof fetch;
+
+    const c = createDatabaseClient(BASE);
+    await c.from('sessions').select('id');
+    await c.from('sessions').select('id');
+
+    expect(calls.filter(x => x.url.includes('/get-session'))).toHaveLength(0);
+    expect(calls.filter(x => x.url.endsWith('/neondb/auth/token/anonymous'))).toHaveLength(1);
+    const dataCalls = calls.filter(x => x.url.startsWith('https://ep-x.apirest.c-8.eu-central-1.aws.neon.tech/neondb/rest/v1/sessions'));
+    expect(dataCalls).toHaveLength(2);
+    for (const d of dataCalls) expect(d.auth).toBe(`Bearer ${jwt}`);
+  });
+});
 
 describe('createDatabaseClient', () => {
   it('reports not configured when url is empty', async () => {
@@ -36,12 +72,12 @@ describe('createDatabaseClient', () => {
     errorSpy.mockRestore();
   });
 
-  it('creates the Neon client with anonymous access', () => {
+  it('creates the Neon client once from the base url', () => {
     const { factory } = fakeFactory();
-    const c = createDatabaseClient(URL, factory);
+    const c = createDatabaseClient(`  ${URL} `, factory);
     expect(c.isConfigured()).toBe(true);
     expect(factory).toHaveBeenCalledTimes(1);
-    expect(factory).toHaveBeenCalledWith(URL, { auth: { allowAnonymous: true } });
+    expect(factory).toHaveBeenCalledWith(URL);
   });
 
   it('delegates from() to the Neon client', () => {

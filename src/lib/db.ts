@@ -2,11 +2,13 @@
  * Database client for QR Tools / HypnoRaffle.
  *
  * Talks to the Neon Data API (PostgREST-compatible) through @neon/neon-js.
- * Every request carries a short-lived anonymous JWT that the SDK fetches and
- * caches itself; Postgres grants + RLS for the `anonymous` role decide access.
+ * Every request carries a short-lived anonymous JWT from Neon Auth, fetched once
+ * and cached (see anonymous-token.ts); Postgres grants + RLS for the `anonymous`
+ * role decide access.
  */
 
-import { createClient } from '@neon/neon-js';
+import { createClient, defaultDeriveNeonUrls } from '@neon/neon-js';
+import { createAnonymousTokenProvider } from './anonymous-token';
 
 export interface PostgrestError {
   message: string;
@@ -30,9 +32,18 @@ export interface NeonLikeClient {
   ): PromiseLike<{ data: unknown; error: { message: string; code?: string } | null }>;
 }
 
-export type ClientFactory = (url: string, opts: { auth: { allowAnonymous: true } }) => NeonLikeClient;
+export type ClientFactory = (baseUrl: string) => NeonLikeClient;
 
-const defaultFactory: ClientFactory = (url, opts) => createClient(url, opts) as unknown as NeonLikeClient;
+/**
+ * Data API client with our own cached anonymous token (the SDK's "external provider" form).
+ * Derives https://<ep>.apirest.<...>/<db>/rest/v1 and https://<ep>.neonauth.<...>/<db>/auth
+ * from the base URL; throws for a malformed URL.
+ */
+const defaultFactory: ClientFactory = (baseUrl) => {
+  const { auth, dataApi } = defaultDeriveNeonUrls(baseUrl);
+  const getToken = createAnonymousTokenProvider(auth);
+  return createClient({ dataApi: { url: dataApi, getToken } }) as unknown as NeonLikeClient;
+};
 
 function dbError(message: string, code: string): PostgrestError {
   return { message, details: '', hint: '', code };
@@ -69,7 +80,7 @@ export function createDatabaseClient(url: string, factory: ClientFactory = defau
   const trimmed = url.trim();
   if (!trimmed) return new DatabaseClient(null); // calls report 'Database not configured'
   try {
-    return new DatabaseClient(factory(trimmed, { auth: { allowAnonymous: true } }));
+    return new DatabaseClient(factory(trimmed));
   } catch (err) {
     // The SDK validates the URL eagerly; a bad value must not crash every page at import time.
     console.error('[DB] Invalid NEXT_PUBLIC_NEON_URL:', err instanceof Error ? err.message : err);
