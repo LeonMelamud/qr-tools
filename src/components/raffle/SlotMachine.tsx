@@ -92,7 +92,9 @@ export function SlotMachine({ participants, winner, isSpinning, onSpinEnd, loadi
     ? [...participants, ...participants, ...participants].slice(0, Math.max(3, participants.length))
     : [];
 
-  const hasParticipants = participants.length > 0;
+  // The reel keeps showing a finished spin even when the winner has since left `participants`
+  // (saved as a winner at the reveal, so the next poll drops them; with the last one, the list is empty)
+  const hasParticipants = participants.length > 0 || displayList.length > 0;
   const isIdle = !isSpinning && !isAnimating;
   const showList = isIdle ? idleList : displayList;
 

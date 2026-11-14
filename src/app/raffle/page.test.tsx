@@ -12,6 +12,9 @@ const h = vi.hoisted(() => ({
   rows: [] as unknown[],
   fail: false,
   hold: null as null | Promise<void>,
+  /** Every update the page sent: table, new values, and its .eq() filters. */
+  updates: [] as { table: string; values: unknown; eq: [string, unknown][] }[],
+  failUpdate: false,
   toast: vi.fn(),
   secureRandom: vi.fn(),
 }));
@@ -21,16 +24,24 @@ vi.mock('@/lib/db', () => {
     if (h.hold) await h.hold;
     return h.fail ? { data: null, error: { message: 'down' } } : { data: h.rows, error: null };
   };
-  const query = (result: () => Promise<unknown>) => {
+  const query = (table: string, result: () => Promise<unknown>) => {
     const q: Record<string, unknown> = {};
-    for (const m of ['select', 'eq', 'update', 'insert', 'delete']) q[m] = () => q;
+    const eq: [string, unknown][] = [];
+    let values: unknown;
+    for (const m of ['select', 'insert', 'delete']) q[m] = () => q;
+    q.update = (v: unknown) => { values = v; return q; };
+    q.eq = (col: string, val: unknown) => { eq.push([col, val]); return q; };
     q.order = result;
-    q.then = (ok: (v: unknown) => unknown) => Promise.resolve({ data: null, error: null }).then(ok);
+    q.then = (ok: (v: unknown) => unknown) => {
+      if (values === undefined) return Promise.resolve({ data: null, error: null }).then(ok);
+      h.updates.push({ table, values, eq });
+      return Promise.resolve(h.failUpdate ? { data: null, error: { message: 'down' } } : { data: null, error: null }).then(ok);
+    };
     return q;
   };
   return {
     db: {
-      from: (table: string) => query(table === 'participants' ? participantsQuery : async () => ({ data: [], error: null })),
+      from: (table: string) => query(table, table === 'participants' ? participantsQuery : async () => ({ data: [], error: null })),
       rpc: async () => ({ data: null, error: null }),
       isConfigured: () => true,
     },
@@ -87,11 +98,31 @@ beforeEach(() => {
   h.rows = [];
   h.fail = false;
   h.hold = null;
+  h.updates = [];
+  h.failUpdate = false;
   h.toast.mockReset();
   h.secureRandom.mockReset();
 });
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
+});
+
+/** The updates that marked this participant as a winner. */
+const wonWrites = (id: string) =>
+  h.updates.filter(u => u.table === 'participants' && JSON.stringify(u.values) === '{"won":true}' && u.eq.some(([c, v]) => c === 'id' && v === id));
+
+/** Draw the participant at `index` of the pool and let the reel stop on them. */
+async function drawAndReveal(start: HTMLElement, index: number) {
+  h.secureRandom.mockReturnValue(index);
+  await press(start);
+  await act(async () => {
+    fireEvent.transitionEnd(reel());
+    await new Promise(r => setTimeout(r, 0));
+  });
+}
 
 describe('raffle draw', () => {
   it('a late joiner who is drawn makes the reel spin to them', async () => {
@@ -162,5 +193,68 @@ describe('raffle draw', () => {
 
     expect(h.secureRandom).toHaveBeenCalledTimes(1);
     expect(reel().style.transform).toMatch(/^translateY\(-\d+px\)$/);
+  }, 10_000);
+});
+
+// Leon, 2026-11-14: the winner was saved only on "Prepare Next Round", so closing or
+// reloading the page after a spin left them in the draw and they could win again.
+describe('saving the winner', () => {
+  it('saves the winner as soon as the reel reveals them, before Prepare Next Round', async () => {
+    const start = await renderRaffle([p('a'), p('b')]);
+
+    await drawAndReveal(start, 1);
+
+    expect(await screen.findByRole('button', { name: /prepare next round/i })).toBeTruthy();
+    expect(wonWrites('b')).toHaveLength(1);
+  });
+
+  it('saves the winner while the winner webhook is still waiting for an answer', async () => {
+    vi.stubEnv('NEXT_PUBLIC_WINNER_WEBHOOK_URL', 'https://hooks.example.test/winner');
+    vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})));
+    const start = await renderRaffle([p('a'), p('b')]);
+
+    await drawAndReveal(start, 0);
+
+    expect(wonWrites('a')).toHaveLength(1);
+  });
+
+  it('does not start the next round while the winner cannot be saved', async () => {
+    const start = await renderRaffle([p('a'), p('b')]);
+    h.failUpdate = true;
+    await drawAndReveal(start, 0);
+
+    await press(await screen.findByRole('button', { name: /prepare next round/i }));
+
+    expect(h.toast).toHaveBeenCalledWith(
+      expect.objectContaining({ variant: 'destructive', title: 'Could not save the winner' })
+    );
+    expect(screen.getByRole('button', { name: /prepare next round/i })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /start raffle/i })).toBeNull();
+  });
+
+  it('a save that failed at the reveal is retried by Prepare Next Round', async () => {
+    const start = await renderRaffle([p('a'), p('b')]);
+    h.failUpdate = true;
+    await drawAndReveal(start, 0);
+    h.failUpdate = false;
+
+    await press(await screen.findByRole('button', { name: /prepare next round/i }));
+
+    expect(wonWrites('a').length).toBeGreaterThanOrEqual(2);
+    expect(await screen.findByRole('button', { name: /start raffle/i })).toBeTruthy();
+  });
+
+  // Saved at the reveal, the next poll (2 s) drops the winner from the available list while
+  // their name is still on screen. When they were the last one, the reel must not go blank.
+  it('the last participant stays on the reel after the poll sees them as a winner', async () => {
+    const start = await renderRaffle([p('amy')]);
+    await drawAndReveal(start, 0);
+    h.rows = [p('amy', true)];
+
+    await new Promise(r => setTimeout(r, 2500));
+
+    expect(reel().textContent).toContain('amy');
+    expect(reel().textContent).not.toMatch(/add participants/i);
+    expect(screen.getByRole('button', { name: /prepare next round/i })).toBeTruthy();
   }, 10_000);
 });

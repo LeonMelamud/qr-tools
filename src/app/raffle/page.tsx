@@ -56,6 +56,8 @@ export default function Home() {
   const [isDrawing, setIsDrawing] = useState(false);
   // Locks the draw from the click until the round ends, so a second click can't pick a second winner
   const drawingRef = useRef(false);
+  // The save of the revealed winner (true once it is in the database)
+  const winnerSaveRef = useRef<Promise<boolean> | null>(null);
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const galleryFileInputRef = useRef<HTMLInputElement>(null);
@@ -277,10 +279,31 @@ export default function Home() {
     }
   };
 
+  const markWon = async (id: string): Promise<boolean> => {
+    try {
+      const { error: updateError } = await db
+        .from('participants')
+        .update({ won: true })
+        .eq('id', id);
+      if (updateError) {
+        console.error('Failed to mark winner in DB:', updateError);
+        return false;
+      }
+      return true;
+    } catch (err) {
+      console.error('Failed to mark winner in DB:', err);
+      return false;
+    }
+  };
+
   const handleSpinEnd = async () => {
     setSpinHasEnded(true);
 
     if (winner) {
+      // Saved the moment the name is revealed, so closing or reloading the page
+      // can't put the winner back in the draw. Started before the webhook, which may be slow.
+      winnerSaveRef.current = markWon(winner.id);
+
       // Send webhook notification
       const webhookUrl = process.env.NEXT_PUBLIC_WINNER_WEBHOOK_URL;
       if (webhookUrl) {
@@ -307,23 +330,23 @@ export default function Home() {
   };
 
   const handleNextRound = async () => {
+    if (winner) {
+      // Wait for the save started at the reveal; if it failed, try once more.
+      // A winner who isn't saved could be drawn again, so the round doesn't move on.
+      const saved = (await winnerSaveRef.current) || (await markWon(winner.id));
+      if (!saved) {
+        toast({
+          title: 'Could not save the winner',
+          description: 'They could be drawn again. Check the connection and press Prepare Next Round again.',
+          variant: 'destructive'
+        });
+        return;
+      }
+      winnerSaveRef.current = null;
+    }
     setSpinHasEnded(false);
     setIsRaffling(false);
     if (winner) {
-      // Mark winner in database
-      try {
-        const { error: updateError } = await db
-          .from('participants')
-          .update({ won: true })
-          .eq('id', winner.id);
-
-        if (updateError) {
-          console.error('Failed to mark winner in DB:', updateError);
-        }
-      } catch (err) {
-        console.error('Failed to mark winner in DB:', err);
-      }
-
       const remaining = availableParticipants.filter(p => p.id !== winner.id);
       setAvailableParticipants(remaining);
 
