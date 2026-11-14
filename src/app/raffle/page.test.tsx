@@ -15,6 +15,9 @@ const h = vi.hoisted(() => ({
   /** Every update the page sent: table, new values, and its .eq() filters. */
   updates: [] as { table: string; values: unknown; eq: [string, unknown][] }[],
   failUpdate: false,
+  /** The fake YouTube sounds the page created, by video id. */
+  sounds: {} as Record<string, { play: ReturnType<typeof vi.fn>; stop: ReturnType<typeof vi.fn>; destroy: ReturnType<typeof vi.fn> }>,
+  soundThrows: false,
   toast: vi.fn(),
   secureRandom: vi.fn(),
 }));
@@ -48,6 +51,15 @@ vi.mock('@/lib/db', () => {
   };
 });
 
+vi.mock('@/lib/youtube-sound', () => ({
+  createYouTubeSound: (videoId: string) => {
+    const call = () => { if (h.soundThrows) throw new Error('player broke'); };
+    const sound = { play: vi.fn(call), stop: vi.fn(call), destroy: vi.fn(call) };
+    h.sounds[videoId] = sound;
+    return sound;
+  },
+}));
+
 vi.mock('@/context/SessionContext', () => ({
   useSessionContext: () => ({ sessionId: 's1', session: null, shortCode: null, loading: false, error: null }),
 }));
@@ -57,7 +69,7 @@ vi.mock('@/lib/utils', async (importOriginal) => ({
   secureRandom: h.secureRandom,
 }));
 vi.mock('@/components/auth/PasswordGate', () => ({ PasswordGate: ({ children }: { children: ReactNode }) => children }));
-vi.mock('@/components/layout/Header', () => ({ Header: () => null }));
+vi.mock('@/components/layout/Header', () => ({ Header: ({ children }: { children?: ReactNode }) => <>{children}</> }));
 vi.mock('@/components/raffle/SessionIndicator', () => ({ SessionIndicator: () => null }));
 vi.mock('@/components/raffle/ParticipantsList', () => ({ ParticipantsList: () => null }));
 vi.mock('@/components/raffle/Confetti', () => ({ Confetti: () => null }));
@@ -100,6 +112,9 @@ beforeEach(() => {
   h.hold = null;
   h.updates = [];
   h.failUpdate = false;
+  h.sounds = {};
+  h.soundThrows = false;
+  try { localStorage.clear(); } catch { /* storage unavailable */ }
   h.toast.mockReset();
   h.secureRandom.mockReset();
 });
@@ -301,5 +316,129 @@ describe('next draw from the winner screen', () => {
     expect(reset).toBeGreaterThan(h.updates.indexOf(wonWrites('amy')[0]));
     expect(h.secureRandom).toHaveBeenCalledTimes(1);
     expect(await screen.findByRole('button', { name: /start raffle/i })).toBeTruthy();
+  });
+});
+
+// Leon, 2026-11-14: a drum roll while the reel spins, applause when the winner is revealed.
+describe('sounds', () => {
+  const drum = () => h.sounds['mzAfTmC3It0'];
+  const applause = () => h.sounds['xiG2xO-4Y-s'];
+
+  it('the drum roll starts at the click, while the list is still refreshing', async () => {
+    const start = await renderRaffle([p('a'), p('b')]);
+    h.hold = new Promise<void>(() => {});
+
+    await press(start);
+
+    expect(screen.getByRole('button', { name: /refreshing list/i })).toBeTruthy();
+    expect(drum().play).toHaveBeenCalledTimes(1);
+  });
+
+  it('the drum roll stops and the applause plays when the reel stops', async () => {
+    const start = await renderRaffle([p('a'), p('b')]);
+    h.secureRandom.mockReturnValue(0);
+    await press(start);
+    expect(applause().play).not.toHaveBeenCalled();
+
+    await act(async () => { fireEvent.transitionEnd(reel()); });
+
+    expect(drum().stop).toHaveBeenCalled();
+    expect(applause().play).toHaveBeenCalledTimes(1);
+  });
+
+  it('the drum roll stops when no winner is drawn', async () => {
+    const start = await renderRaffle([p('a'), p('b')]);
+    h.fail = true;
+
+    await press(start);
+
+    expect(drum().play).toHaveBeenCalledTimes(1);
+    expect(drum().stop).toHaveBeenCalled();
+    expect(applause().play).not.toHaveBeenCalled();
+  });
+
+  it('the next draw from the winner screen stops the applause and starts the drum roll again', async () => {
+    const start = await renderRaffle([p('a'), p('b')]);
+    await drawAndReveal(start, 0);
+    h.rows = [p('a', true), p('b')];
+
+    h.secureRandom.mockReturnValue(0);
+    await press(await screen.findByRole('button', { name: /start raffle/i }));
+
+    expect(applause().stop).toHaveBeenCalled();
+    expect(drum().play).toHaveBeenCalledTimes(2);
+  });
+
+  it('Start New Round stops the applause', async () => {
+    const start = await renderRaffle([p('amy')]);
+    await drawAndReveal(start, 0);
+
+    await press(await screen.findByRole('button', { name: /start new round/i }));
+
+    expect(applause().stop).toHaveBeenCalled();
+  });
+
+  it('a broken sound player never stops the draw', async () => {
+    const start = await renderRaffle([p('a'), p('b')]);
+    h.soundThrows = true;
+
+    await drawAndReveal(start, 1);
+
+    expect(h.secureRandom).toHaveBeenCalledTimes(1);
+    expect(wonWrites('b')).toHaveLength(1);
+    expect(await screen.findByRole('button', { name: /start raffle/i })).toBeTruthy();
+  });
+});
+
+// Leon, 2026-11-14: a speaker button to mute the sounds.
+describe('speaker button', () => {
+  const drum = () => h.sounds['mzAfTmC3It0'];
+  const applause = () => h.sounds['xiG2xO-4Y-s'];
+  const speaker = (name: RegExp) => screen.getByRole('button', { name });
+
+  it('mutes the drum roll and the applause', async () => {
+    const start = await renderRaffle([p('a'), p('b')]);
+
+    fireEvent.click(speaker(/mute sounds/i));
+    await drawAndReveal(start, 0);
+
+    expect(drum().play).not.toHaveBeenCalled();
+    expect(applause().play).not.toHaveBeenCalled();
+    expect(wonWrites('a')).toHaveLength(1);
+  });
+
+  it('muting while the applause plays stops it', async () => {
+    const start = await renderRaffle([p('a'), p('b')]);
+    await drawAndReveal(start, 0);
+    expect(applause().play).toHaveBeenCalledTimes(1);
+    applause().stop.mockClear();
+
+    fireEvent.click(speaker(/mute sounds/i));
+
+    expect(applause().stop).toHaveBeenCalled();
+  });
+
+  it('turning the sounds back on plays them again', async () => {
+    const start = await renderRaffle([p('a'), p('b')]);
+    fireEvent.click(speaker(/mute sounds/i));
+
+    fireEvent.click(speaker(/turn sounds on/i));
+    h.secureRandom.mockReturnValue(0);
+    await press(start);
+
+    expect(drum().play).toHaveBeenCalledTimes(1);
+  });
+
+  it('remembers the choice after a reload', async () => {
+    await renderRaffle([p('a'), p('b')]);
+    fireEvent.click(speaker(/mute sounds/i));
+    cleanup();
+
+    const start = await renderRaffle([p('a'), p('b')]);
+    expect(await screen.findByRole('button', { name: /turn sounds on/i })).toBeTruthy();
+    h.secureRandom.mockReturnValue(0);
+    await press(start);
+
+    expect(drum().play).not.toHaveBeenCalled();
   });
 });

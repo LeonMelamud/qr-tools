@@ -16,6 +16,8 @@ import { useSessionContext } from '../../context/SessionContext';
 import { Confetti } from '../../components/raffle/Confetti';
 import { LivePausedBadge } from '../../components/raffle/LivePausedBadge';
 import { drawPool } from '../../lib/draw-pool';
+import { useRaffleSounds } from '../../hooks/use-raffle-sounds';
+import { SoundToggle } from '../../components/raffle/SoundToggle';
 import Image from 'next/image';
 import { db } from '../../lib/db';
 import { fileToDataUrl } from '../../lib/image-data-url';
@@ -59,6 +61,7 @@ export default function Home() {
   // The save of the revealed winner (true once it is in the database)
   const winnerSaveRef = useRef<Promise<boolean> | null>(null);
   const { toast } = useToast();
+  const sounds = useRaffleSounds();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const galleryFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -69,6 +72,7 @@ export default function Home() {
 
   // Reset raffle state when session changes
   useEffect(() => {
+    sounds.stopAll();
     setWinner(null);
     setIsRaffling(false);
     setSpinHasEnded(false);
@@ -246,6 +250,8 @@ export default function Home() {
     if (drawingRef.current) return;
     drawingRef.current = true;
     setIsDrawing(true);
+    // Started in the click itself (before any await), so the browser counts it as user-started
+    sounds.drumRoll();
     let started = false;
     try {
       // The winner still on screen must be saved first, or they could be drawn again
@@ -288,7 +294,10 @@ export default function Home() {
       started = true;
     } finally {
       setIsDrawing(false);
-      if (!started) drawingRef.current = false;
+      if (!started) {
+        drawingRef.current = false;
+        sounds.stopAll();
+      }
     }
   };
 
@@ -311,6 +320,7 @@ export default function Home() {
 
   const handleSpinEnd = async () => {
     setSpinHasEnded(true);
+    sounds.applause();
     // The reel has stopped: Start Raffle can draw the next winner
     drawingRef.current = false;
 
@@ -361,6 +371,7 @@ export default function Home() {
   };
 
   const handleResetRaffle = async () => {
+    sounds.stopAll();
     // Reset all winners in DB
     try {
       await db
@@ -401,7 +412,9 @@ export default function Home() {
           onParticipantsLoad={handleParticipantsLoad}
           isRaffling={isRaffling}
           onLogoRain={handleLogoRain}
-        />
+        >
+          <SoundToggle muted={sounds.muted} onToggle={sounds.toggleMute} />
+        </Header>
 
         <div className="w-full max-w-2xl mx-auto flex-grow flex flex-col items-center justify-start gap-8">
 

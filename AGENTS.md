@@ -30,7 +30,8 @@ src/
 │   │   ├── ParticipantImporter.tsx
 │   │   ├── ParticipantsList.tsx
 │   │   ├── SessionIndicator.tsx
-│   │   └── SlotMachine.tsx # Main raffle animation
+│   │   ├── SlotMachine.tsx # Main raffle animation
+│   │   └── SoundToggle.tsx # Speaker button (mute drum roll / applause)
 │   └── ui/                # shadcn/ui components (DO NOT MODIFY)
 ├── context/               # React Context providers
 │   ├── ParticipantsContext.tsx
@@ -38,12 +39,14 @@ src/
 │   └── SessionContext.tsx
 ├── hooks/                 # Custom React hooks
 │   ├── use-participants.ts # Participants polling hook
+│   ├── use-raffle-sounds.ts # Drum roll while spinning, applause on the winner, mute
 │   ├── use-session.ts     # Session management
 │   └── use-toast.ts       # Toast notifications
 ├── lib/                   # Utilities and configurations
 │   ├── db.ts              # Database client (Neon Data API, anonymous access)
 │   ├── image-data-url.ts  # Image upload -> downscaled data: URL (stored in rows)
 │   ├── poll-gate.ts       # When live polling pauses (idle / hidden tab)
+│   ├── youtube-sound.ts   # YouTube video as a sound effect (invisible 200x200 player)
 │   └── utils.ts           # Helper functions (secureRandom, cn, etc.)
 ├── types/                 # TypeScript type definitions
 │   └── index.ts           # Participant, Session interfaces
