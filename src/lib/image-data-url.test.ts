@@ -8,10 +8,16 @@ afterEach(() => {
   delete g.createImageBitmap;
 });
 
-function stubCanvas(dataUrl: string) {
-  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({ drawImage: vi.fn() } as never);
-  vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue(dataUrl);
+function stubCanvas(dataUrl: string | ((type?: string) => string)) {
+  const ctx = { drawImage: vi.fn(), fillRect: vi.fn(), fillStyle: '', globalCompositeOperation: 'source-over' };
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(ctx as never);
+  vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockImplementation(
+    typeof dataUrl === 'function' ? (type?: string) => dataUrl(type) : () => dataUrl
+  );
+  return ctx;
 }
+
+const overCap = (mime: string) => `data:${mime};base64,` + 'A'.repeat(MAX_DATA_URL_LENGTH + 1);
 
 function stubBitmap(width: number, height: number) {
   g.createImageBitmap = vi.fn().mockResolvedValue({ width, height, close() {} });
@@ -94,5 +100,38 @@ describe('fileToDataUrl', () => {
     expect(canvas.width).toBe(800);
     expect(canvas.height).toBe(400);
     expect(HTMLCanvasElement.prototype.toDataURL).toHaveBeenCalledWith('image/png', 0.9);
+  });
+
+  // 2026-11-14 branch review, finding 4: an 800 px photo saved as PNG is often well over
+  // 1M characters, and the user had no way forward in the app.
+  it('re-encodes a PNG that is over the cap as JPEG on a white background', async () => {
+    stubBitmap(800, 800);
+    const order: string[] = [];
+    const ctx = stubCanvas(type => {
+      order.push(`encode ${type}`);
+      return type === 'image/jpeg' ? 'data:image/jpeg;base64,AAAA' : overCap('image/png');
+    });
+    ctx.fillRect.mockImplementation(() => order.push(`fill ${ctx.fillStyle} ${ctx.globalCompositeOperation}`));
+
+    await expect(fileToDataUrl(png())).resolves.toBe('data:image/jpeg;base64,AAAA');
+
+    expect(order).toEqual(['encode image/png', 'fill #ffffff destination-over', 'encode image/jpeg']);
+    expect(ctx.fillRect).toHaveBeenCalledWith(0, 0, 800, 800);
+    expect(HTMLCanvasElement.prototype.toDataURL).toHaveBeenLastCalledWith('image/jpeg', 0.85);
+  });
+
+  it('falls back to JPEG when the browser encoded a format it does not support as PNG', async () => {
+    // e.g. toDataURL('image/webp') returns PNG on browsers without a WebP encoder
+    stubBitmap(800, 800);
+    stubCanvas(type => (type === 'image/jpeg' ? 'data:image/jpeg;base64,AAAA' : overCap('image/png')));
+    const webp = new File([new Uint8Array([1])], 'a.webp', { type: 'image/webp' });
+    await expect(fileToDataUrl(webp)).resolves.toBe('data:image/jpeg;base64,AAAA');
+  });
+
+  it('keeps a PNG that fits as PNG, so transparency survives', async () => {
+    stubBitmap(800, 800);
+    const ctx = stubCanvas(type => (type === 'image/png' ? 'data:image/png;base64,AAAA' : 'data:image/jpeg;base64,BBBB'));
+    await expect(fileToDataUrl(png())).resolves.toBe('data:image/png;base64,AAAA');
+    expect(ctx.fillRect).not.toHaveBeenCalled();
   });
 });

@@ -3,12 +3,14 @@
  * Postgres row (raffle_images.url, qr_refs.logo_url).
  *
  * Raster images are downscaled in the browser so the long side is at most
- * MAX_IMAGE_DIMENSION. SVGs are kept as-is. Every failure rejects with an
+ * MAX_IMAGE_DIMENSION, and re-encoded as JPEG when the result would be over
+ * MAX_DATA_URL_LENGTH. SVGs are kept as-is. Every failure rejects with an
  * Error whose message can be shown to the user directly.
  */
 
 export const MAX_IMAGE_DIMENSION = 800;
-export const MAX_DATA_URL_LENGTH = 1_000_000;
+export const MAX_DATA_URL_LENGTH = 1_000_000; // a 1,000,000-char row round-trips through the Data API (checked 2026-11-14)
+const JPEG_FALLBACK_QUALITY = 0.85;
 
 type OutputMime = 'image/png' | 'image/jpeg' | 'image/webp' | 'image/svg+xml';
 
@@ -68,5 +70,14 @@ export async function fileToDataUrl(file: File, maxDim: number = MAX_IMAGE_DIMEN
   ctx.drawImage(bitmap, 0, 0, size.width, size.height);
   bitmap.close?.();
 
-  return withinCap(canvas.toDataURL(mime, 0.9));
+  let url = canvas.toDataURL(mime, 0.9);
+  // A photo saved as PNG (or a type this browser can't encode, which comes back as PNG) is
+  // often over the cap: re-encode as JPEG, on white because JPEG has no transparency.
+  if (url.length > MAX_DATA_URL_LENGTH && !url.startsWith('data:image/jpeg')) {
+    ctx.globalCompositeOperation = 'destination-over';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, size.width, size.height);
+    url = canvas.toDataURL('image/jpeg', JPEG_FALLBACK_QUALITY);
+  }
+  return withinCap(url);
 }
