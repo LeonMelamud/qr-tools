@@ -30,7 +30,9 @@ import {
 } from 'lucide-react';
 import { useToast } from '../../hooks/use-toast';
 import { PasswordGate } from '../../components/auth/PasswordGate';
-import { db, supabaseAuth } from '../../lib/supabase';
+import { db } from '../../lib/db';
+import { fileToDataUrl } from '../../lib/image-data-url';
+import { QR_REDIRECT_COLUMNS } from '../../lib/qr-redirect';
 import { isExpired, generateSlug, downloadQRCode, QRDownloadOptions } from '../../lib/qr-utils';
 import { QrRef } from '../../types';
 
@@ -185,7 +187,7 @@ function QRRefContent() {
       try {
         const { data: qrRef, error } = await db
           .from('qr_refs')
-          .select('*')
+          .select(QR_REDIRECT_COLUMNS)
           .eq('slug', redirectSlug)
           .single();
 
@@ -380,39 +382,29 @@ function QRRefContent() {
   const getQrPageUrl = () =>
     typeof window !== 'undefined' ? `${window.location.origin}/qr-ref?go=${selectedQr?.slug}` : '';
 
-  // Logo handling - uploads to the qr-logos Storage bucket and saves the URL on this QR ref
+  // Logo handling - stores the image on this QR ref as a downscaled data: URL
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !selectedQr) return;
 
-    if (file.size > 500 * 1024) { // 500KB limit
-      toast({ title: "File too large", description: "Please use an image under 500KB.", variant: "destructive" });
+    let logoDataUrl: string;
+    try {
+      logoDataUrl = await fileToDataUrl(file);
+    } catch (err) {
+      toast({ title: "Upload failed", description: err instanceof Error ? err.message : 'Could not read this image', variant: "destructive" });
+      if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
 
-    if (!supabaseAuth) {
-      toast({ title: "Error", description: "Storage is not configured.", variant: "destructive" });
-      return;
-    }
-
-    const ext = file.name.split('.').pop();
-    const path = `${selectedQr.id}-${Date.now()}.${ext}`;
-    const { error: uploadError } = await supabaseAuth.storage.from('qr-logos').upload(path, file);
-    if (uploadError) {
-      toast({ title: "Upload failed", description: uploadError.message, variant: "destructive" });
-      return;
-    }
-
-    const { data: { publicUrl } } = supabaseAuth.storage.from('qr-logos').getPublicUrl(path);
     const { data, error } = await db
       .from<QrRef>('qr_refs')
-      .update({ logo_url: publicUrl })
+      .update({ logo_url: logoDataUrl })
       .eq('id', selectedQr.id)
       .select()
       .single();
 
     if (error) {
-      toast({ title: "Error", description: "Logo uploaded but failed to save to this QR code.", variant: "destructive" });
+      toast({ title: "Error", description: "Failed to save the logo to this QR code.", variant: "destructive" });
       return;
     }
 

@@ -17,7 +17,8 @@ import { Confetti } from '../../components/raffle/Confetti';
 import { LivePausedBadge } from '../../components/raffle/LivePausedBadge';
 import { drawPool } from '../../lib/draw-pool';
 import Image from 'next/image';
-import { db } from '../../lib/supabase';
+import { db } from '../../lib/db';
+import { fileToDataUrl } from '../../lib/image-data-url';
 import placeholderData from '../../lib/placeholder-images.json';
 
 interface AvailableImage {
@@ -75,7 +76,7 @@ export default function Home() {
       if (error) throw error;
 
       if (data && data.length > 0) {
-        setAvailableImages(data.map(img => ({ id: img.id, src: img.url, alt: img.alt || 'Raffle image' })));
+        setAvailableImages((data as RaffleImage[]).map(img => ({ id: img.id, src: img.url, alt: img.alt || 'Raffle image' })));
       } else {
         setAvailableImages(placeholderData.images || []);
       }
@@ -98,29 +99,23 @@ export default function Home() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const supabaseClient = db.getSupabaseClient();
-    if (!supabaseClient) {
-      toast({ title: "Error", description: "Storage is not configured.", variant: "destructive" });
+    // The image is stored in the row itself as a downscaled data: URL
+    let url: string;
+    try {
+      url = await fileToDataUrl(file);
+    } catch (err) {
+      toast({ title: "Upload failed", description: err instanceof Error ? err.message : 'Could not read this image', variant: "destructive" });
+      if (galleryFileInputRef.current) galleryFileInputRef.current.value = '';
       return;
     }
 
-    const ext = file.name.split('.').pop();
-    const path = `${crypto.randomUUID()}.${ext}`;
-    const { error: uploadError } = await supabaseClient.storage.from('raffle-images').upload(path, file);
-    if (uploadError) {
-      toast({ title: "Upload failed", description: uploadError.message, variant: "destructive" });
-      return;
-    }
-
-    const { data: { publicUrl } } = supabaseClient.storage.from('raffle-images').getPublicUrl(path);
     const { error: insertError } = await db.from('raffle_images').insert({
-      url: publicUrl,
-      storage_path: path,
+      url,
       alt: file.name.replace(/\.[^.]+$/, ''),
     });
 
     if (insertError) {
-      toast({ title: "Error", description: "Image uploaded but failed to save to the gallery.", variant: "destructive" });
+      toast({ title: "Upload failed", description: "Could not save the image to the gallery.", variant: "destructive" });
       return;
     }
 
@@ -134,17 +129,11 @@ export default function Home() {
     const current = availableImages[currentImageIndex];
     if (!current) return;
 
-    const supabaseClient = db.getSupabaseClient();
-    const { data: row } = await db
-      .from<RaffleImage>('raffle_images')
-      .select('*')
-      .eq('id', current.id)
-      .single();
-
-    if (row && supabaseClient) {
-      await supabaseClient.storage.from('raffle-images').remove([row.storage_path]);
+    const { error: deleteError } = await db.from('raffle_images').delete().eq('id', current.id);
+    if (deleteError) {
+      toast({ title: "Error", description: "Could not remove the image.", variant: "destructive" });
+      return;
     }
-    await db.from('raffle_images').delete().eq('id', current.id);
 
     toast({ title: "Image removed" });
     await fetchImages();

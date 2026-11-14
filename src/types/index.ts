@@ -36,14 +36,13 @@ export interface QrRef {
   scan_count?: number;
   display_title?: string;   // Custom title shown on QR card (defaults to name)
   display_message?: string; // Custom message shown on QR card (defaults to description)
-  logo_url?: string;        // Center logo image, stored in the qr-logos Storage bucket
+  logo_url?: string;        // Center logo image, stored in the row as a data: URL
   created_at: string;
 }
 
 export interface RaffleImage {
   id: string;
-  url: string;
-  storage_path: string;
+  url: string;              // The image itself, as a data: URL
   alt?: string;
   created_at?: string;
 }

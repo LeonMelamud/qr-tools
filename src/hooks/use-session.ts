@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { db } from '../lib/supabase';
+import { db } from '../lib/db';
 
 interface Session {
   id: string;
